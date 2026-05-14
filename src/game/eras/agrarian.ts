@@ -36,10 +36,11 @@ export const agrarianUpgrades: Upgrade[] = [
 ];
 
 const BASE_GRAIN_CAP = 75;
-const CAP_PER_GRANARY = 50;
 
 export function grainCap(s = get(game)): number {
-  return BASE_GRAIN_CAP + CAP_PER_GRANARY * (s.upgrades.granary ?? 0);
+  const perGranary = s.flags.pottery ? 100 : 50;
+  const base = BASE_GRAIN_CAP + (s.flags.wattleFences ? 75 : 0);
+  return base + perGranary * (s.upgrades.granary ?? 0);
 }
 
 export function buyUpgrade(id: string) {
@@ -60,7 +61,11 @@ export function buyUpgrade(id: string) {
 export function grainPerSec(s = get(game)): number {
   const plows = s.upgrades.plow ?? 0;
   const irrig = s.upgrades.irrigation ?? 0;
-  return plows * Math.pow(2, irrig);
+  const baseMult = s.flags.cropRotation ? 2 : 1;
+  const toolMult = s.flags.bronzeTools ? 3 : 1;
+  const plowOutput = plows * Math.pow(2, irrig) * baseMult * toolMult;
+  const popOutput = s.flags.writing ? (s.resources.pop ?? 0) * 0.5 : 0;
+  return plowOutput + popOutput;
 }
 
 function gainGrainCapped(amount: number) {
@@ -89,9 +94,4 @@ export function tickAgrarian(dt: number) {
     }
   }
 
-  // Era transition trigger (placeholder for now)
-  if (!s.flags.industrialUnlocked && s.resources.pop >= 100 && (s.upgrades.plow ?? 0) >= 20) {
-    game.update(s => ({ ...s, flags: { ...s.flags, industrialUnlocked: true } }));
-    logEvent('Smoke rises on the horizon. Something is changing.');
-  }
 }

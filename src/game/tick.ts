@@ -1,6 +1,7 @@
 import { get } from 'svelte/store';
 import { game } from './game';
 import { tickAgrarian } from './eras/agrarian';
+import { tickIndustrial } from './eras/industrial';
 import { saveState } from './save';
 
 const TICK_MS = 100;
@@ -17,11 +18,10 @@ export function startLoop() {
     const dt = (now - s.lastTick) / 1000;
     game.update(s => ({ ...s, lastTick: now }));
 
-    switch (s.era) {
-      case 'agrarian':
-        tickAgrarian(dt);
-        break;
-      // future eras here
+    // Agrarian systems keep running in later eras (grain still flows).
+    tickAgrarian(dt);
+    if (s.era === 'industrial') {
+      tickIndustrial(dt);
     }
 
     if (now - lastSave > SAVE_EVERY_MS) {
