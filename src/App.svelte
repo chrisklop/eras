@@ -172,7 +172,7 @@
           </div>
         {/if}
         <div class="res">
-          <span class="label">Output</span>
+          <span class="label">Goods</span>
           <span class="val">{fmt(outputAmt)} / {fmt(outputCap($game))}</span>
           <span class="rate">+{fmt(outputPerSec($game))}/s</span>
         </div>
@@ -259,7 +259,7 @@
 
       {#if upgradesHorizon}
         {@const horCost = upgradesHorizon.cost.grain ?? upgradesHorizon.cost.output ?? 0}
-        {@const horRes = upgradesHorizon.cost.grain !== undefined ? 'grain' : 'output'}
+        {@const horRes = upgradesHorizon.cost.grain !== undefined ? 'grain' : 'goods'}
         {@const horHave = horRes === 'grain' ? grainAmt : outputAmt}
         {@const horPct = Math.max(0, Math.min(1, horHave / horCost))}
         <div class="horizon">
@@ -384,7 +384,7 @@
           <div class="cost">
             {#if unlocked}
               {eff.grain !== undefined ? `${fmt(eff.grain)} grain` : ''}
-              {eff.output !== undefined ? ` ${fmt(eff.output)} output` : ''}
+              {eff.output !== undefined ? ` ${fmt(eff.output)} goods` : ''}
             {/if}
           </div>
         </button>

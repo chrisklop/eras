@@ -136,7 +136,7 @@ export const projects: Project[] = [
   {
     id: 'industrialRevolution',
     name: 'The Industrial Revolution',
-    desc: 'Steam and smoke. Begin the next era. Grain remains, but Output is the new measure.',
+    desc: 'Steam and smoke. Begin the next era. Grain remains, but Goods are the new measure.',
     cost: { grain: 40000 },
     era: 'agrarian',
     requires: s =>
@@ -157,7 +157,7 @@ export const projects: Project[] = [
   {
     id: 'bessemer',
     name: 'Bessemer Process',
-    desc: 'Coal-fired steel. Factories now require coal alongside grain, but produce 3× output.',
+    desc: 'Coal-fired steel. Factories now require coal alongside grain, but produce 3× Goods.',
     cost: { output: 300 },
     era: 'industrial',
     requires: s => s.era === 'industrial' && (s.upgrades.factory ?? 0) >= 3 && (s.upgrades.mine ?? 0) >= 1,
@@ -179,7 +179,7 @@ export const projects: Project[] = [
   {
     id: 'massProduction',
     name: 'Mass Production',
-    desc: 'Standard parts, assembly lines. Factories produce 2× output.',
+    desc: 'Standard parts, assembly lines. Factories produce 2× Goods.',
     cost: { output: 1200 },
     era: 'industrial',
     requires: s => s.era === 'industrial' && (s.upgrades.factory ?? 0) >= 4,
@@ -223,7 +223,7 @@ export const projects: Project[] = [
   {
     id: 'electricity',
     name: 'Electricity',
-    desc: 'Wire the cities. Factory output doubles again.',
+    desc: 'Wire the cities. Goods production doubles again.',
     cost: { output: 25000 },
     era: 'industrial',
     requires: s => s.era === 'industrial' && !!s.completedProjects.massProduction && (s.upgrades.factory ?? 0) >= 12,
