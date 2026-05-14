@@ -11,6 +11,8 @@ export interface GameState {
   log: string[];
   startedAt: number;
   lastTick: number;
+  peakPop?: number;
+  peakOutput?: number;
 }
 
 export const initialState: GameState = {
@@ -22,6 +24,8 @@ export const initialState: GameState = {
   log: ['A small settlement gathers by the river.'],
   startedAt: Date.now(),
   lastTick: Date.now(),
+  peakPop: 0,
+  peakOutput: 0,
 };
 
 export const game = writable<GameState>(initialState);

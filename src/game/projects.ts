@@ -1,5 +1,6 @@
 import { get } from 'svelte/store';
 import { game, logEvent, type GameState, type EraId } from './game';
+import { legacyProjectCostMultiplier } from './legacy';
 
 export interface Project {
   id: string;
@@ -241,9 +242,18 @@ export function projectIncomplete(p: Project, s: GameState): boolean {
   return !s.completedProjects[p.id];
 }
 
-export function canAffordProject(p: Project, s: GameState): boolean {
+export function effectiveProjectCost(p: Project): Record<string, number> {
+  const mult = legacyProjectCostMultiplier();
+  const out: Record<string, number> = {};
   for (const [res, amt] of Object.entries(p.cost)) {
-    if ((s.resources[res] ?? 0) < (amt ?? 0)) return false;
+    if (amt !== undefined) out[res] = Math.ceil(amt * mult);
+  }
+  return out;
+}
+
+export function canAffordProject(p: Project, s: GameState): boolean {
+  for (const [res, amt] of Object.entries(effectiveProjectCost(p))) {
+    if ((s.resources[res] ?? 0) < amt) return false;
   }
   return true;
 }
@@ -256,8 +266,8 @@ export function completeProject(id: string) {
   if (!canAffordProject(p, s)) return;
 
   const newResources = { ...s.resources };
-  for (const [res, amt] of Object.entries(p.cost)) {
-    newResources[res] = (newResources[res] ?? 0) - (amt ?? 0);
+  for (const [res, amt] of Object.entries(effectiveProjectCost(p))) {
+    newResources[res] = (newResources[res] ?? 0) - amt;
   }
   const patch = p.apply(s);
   game.update(cur => ({

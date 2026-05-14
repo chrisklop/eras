@@ -1,5 +1,6 @@
 import { get } from 'svelte/store';
 import { game, spend, logEvent, type GameState } from '../game';
+import { legacyPlowMultiplier, legacyGrainCapMultiplier, legacyPopGrowthBonus } from '../legacy';
 
 // =============================================================================
 // Cost & cap constants — single source of truth.
@@ -117,10 +118,11 @@ export const agrarianUpgrades: Upgrade[] = [
 export function grainCap(s: GameState = get(game)): number {
   const granaries = s.upgrades.granary ?? 0;
   const base = BASE_GRAIN_CAP + (s.flags.wattleFences ? WATTLE_FENCES_BONUS : 0);
+  const legacyMult = legacyGrainCapMultiplier();
   if (s.flags.pottery) {
-    return Math.floor(base * Math.pow(POTTERY_CAP_MULT, granaries));
+    return Math.floor(base * legacyMult * Math.pow(POTTERY_CAP_MULT, granaries));
   }
-  return base + PRE_POTTERY_CAP_PER_GRANARY * granaries;
+  return Math.floor((base + PRE_POTTERY_CAP_PER_GRANARY * granaries) * legacyMult);
 }
 
 export function popCap(s: GameState = get(game)): number {
@@ -135,7 +137,7 @@ export function dwellingMaxLevel(s: GameState = get(game)): number {
 export function popGrowthPerSec(s: GameState = get(game)): number {
   const dwellings = s.upgrades.dwelling ?? 0;
   const compassBoost = s.flags.compass ? 0.5 : 0;
-  return Math.min(MAX_POP_GROWTH, BASE_POP_GROWTH + POP_GROWTH_PER_DWELLING * dwellings + compassBoost);
+  return Math.min(MAX_POP_GROWTH, BASE_POP_GROWTH + POP_GROWTH_PER_DWELLING * dwellings + compassBoost + legacyPopGrowthBonus());
 }
 
 // Labor demand — every building needs workers from population.
@@ -188,7 +190,7 @@ export function grainConsumedPerSec(s: GameState = get(game)): number {
 /** Full multiplier on per-plow output (includes level-stacked irrigation). */
 export function plowMultiplier(s: GameState = get(game)): number {
   const irrig = s.upgrades.irrigation ?? 0;
-  return Math.pow(IRRIGATION_PER_LEVEL, irrig) * plowCostMultiplier(s);
+  return Math.pow(IRRIGATION_PER_LEVEL, irrig) * plowCostMultiplier(s) * legacyPlowMultiplier();
 }
 
 /** Bounded multiplier used for cost scaling (project flags only — no level

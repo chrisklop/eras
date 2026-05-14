@@ -6,8 +6,22 @@
   import { projects, projectAvailable, projectIncomplete, completeProject } from './game/projects';
   import { startLoop, stopLoop } from './game/tick';
   import { hydrate, resetGame } from './game/save';
+  import {
+    legacy,
+    LEGACY_NODES,
+    legacyEarnedAt,
+    canCollapse,
+    nodeOwned,
+    nodeAvailable,
+    buyNode,
+    collapse,
+    hydrateLegacy,
+  } from './game/legacy';
+
+  let showLegacy = false;
 
   onMount(() => {
+    hydrateLegacy();
     hydrate();
     startLoop();
   });
@@ -95,10 +109,21 @@
   $: upgradesHorizon = nextHorizon($game.era === 'industrial' || $game.era === 'information' ? 'industrial' : 'agrarian');
 
   function hardReset() {
-    if (confirm('Wipe save and restart?')) {
+    if (confirm('Wipe save and restart? (Legacy points are kept — use the Legacy panel to wipe those.)')) {
       resetGame();
       logEvent('A new settlement gathers by the river.');
     }
+  }
+
+  $: peakPop = $game.peakPop ?? 0;
+  $: peakOutput = $game.peakOutput ?? 0;
+  $: pendingLegacy = legacyEarnedAt(peakPop, peakOutput);
+
+  function doCollapse() {
+    if (!canCollapse($game)) return;
+    if (!confirm(`Collapse this civilization for +${pendingLegacy} Legacy?\nCurrent run is reset; Legacy points and nodes persist.`)) return;
+    const r = collapse();
+    if (r) showLegacy = true;
   }
 </script>
 
@@ -151,8 +176,77 @@
         </div>
       {/if}
     </div>
+    <button class="legacy-chip" on:click={() => (showLegacy = true)} title="Open Legacy panel">
+      <span class="legacy-label">Legacy</span>
+      <span class="legacy-val">{$legacy.points}</span>
+    </button>
     <button class="reset" on:click={hardReset}>reset</button>
   </header>
+
+  {#if showLegacy}
+    <div class="modal-backdrop" on:click={() => (showLegacy = false)}>
+      <div class="modal" on:click|stopPropagation>
+        <header class="modal-head">
+          <h2>Legacy</h2>
+          <button class="close" on:click={() => (showLegacy = false)}>×</button>
+        </header>
+        <div class="legacy-summary">
+          <div><strong>{$legacy.points}</strong> <span class="dim">points</span></div>
+          <div class="dim small">{$legacy.lifetimeEarned} earned · {$legacy.collapses} collapses</div>
+        </div>
+
+        <section class="legacy-collapse">
+          <div class="row">
+            <div>
+              <div class="dim small">This civilization</div>
+              <div>Peak pop {Math.floor(peakPop)} · peak output {fmt(peakOutput)}</div>
+            </div>
+            <div class="collapse-cta">
+              <div class="dim small">Collapse for</div>
+              <div class="cta-num">+{pendingLegacy} legacy</div>
+              <button
+                class="collapse-btn"
+                disabled={!canCollapse($game) || pendingLegacy < 1}
+                on:click={doCollapse}
+              >
+                {canCollapse($game) ? 'Collapse civilization' : `Need pop ≥ 10 (have ${Math.floor(peakPop)})`}
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section class="legacy-nodes">
+          <h3>Permanent benefits</h3>
+          {#each LEGACY_NODES as n (n.id)}
+            {@const owned = nodeOwned(n.id, $legacy)}
+            {@const avail = nodeAvailable(n, $legacy)}
+            {@const affordable = $legacy.points >= n.cost}
+            <div class="node" class:owned class:locked={!avail && !owned}>
+              <div class="node-head">
+                <strong>{n.name}</strong>
+                <span class="node-cost">
+                  {#if owned}acquired{:else}{n.cost} pts{/if}
+                </span>
+              </div>
+              <div class="node-desc">{n.desc}</div>
+              {#if n.requires && !owned}
+                <div class="node-req dim small">Requires: {LEGACY_NODES.find(x => x.id === n.requires)?.name}</div>
+              {/if}
+              {#if !owned}
+                <button
+                  class="node-buy"
+                  disabled={!avail || !affordable}
+                  on:click={() => buyNode(n.id)}
+                >
+                  {#if !avail}locked{:else if !affordable}need {n.cost - $legacy.points} more{:else}acquire{/if}
+                </button>
+              {/if}
+            </div>
+          {/each}
+        </section>
+      </div>
+    </div>
+  {/if}
 
   <main class="grid">
     <section class="pane upgrades-pane">
@@ -692,4 +786,63 @@
     .res { min-width: 100px; padding-left: 0.6rem; }
     .big { margin-left: 0; }
   }
+
+  .legacy-chip {
+    display: inline-flex; flex-direction: column; align-items: center;
+    padding: 0.4rem 0.9rem; margin-right: 0.6rem;
+    background: transparent; border: 1px solid var(--gilt, #d4a13a);
+    color: var(--gilt, #d4a13a); border-radius: 4px;
+    cursor: pointer; font-family: inherit;
+  }
+  .legacy-chip:hover { background: rgba(212, 161, 58, 0.1); }
+  .legacy-label { font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase; opacity: 0.75; }
+  .legacy-val { font-family: var(--font-mono, monospace); font-size: 1.1rem; font-weight: 600; }
+
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.65);
+    display: flex; align-items: center; justify-content: center; z-index: 100;
+  }
+  .modal {
+    background: var(--bg, #1d1610); border: 1px solid var(--gilt, #d4a13a);
+    width: min(640px, 92vw); max-height: 88vh; overflow-y: auto;
+    padding: 1.4rem 1.6rem; border-radius: 6px;
+    color: var(--ink, #e4d3a8);
+  }
+  .modal-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1rem; }
+  .modal-head h2 { margin: 0; font-family: var(--font-display, serif); letter-spacing: 0.04em; }
+  .modal-head .close {
+    background: transparent; border: none; color: inherit; font-size: 1.8rem;
+    cursor: pointer; line-height: 1; padding: 0 0.4rem;
+  }
+  .legacy-summary { text-align: center; margin-bottom: 1.2rem; padding: 0.8rem; border: 1px solid rgba(212,161,58,0.25); border-radius: 4px; }
+  .legacy-summary strong { font-size: 2rem; font-family: var(--font-mono, monospace); color: var(--gilt, #d4a13a); }
+  .dim { opacity: 0.6; }
+  .small { font-size: 0.78rem; letter-spacing: 0.04em; }
+
+  .legacy-collapse { margin-bottom: 1.4rem; padding: 0.9rem; border: 1px solid rgba(197,88,58,0.4); border-radius: 4px; }
+  .legacy-collapse .row { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+  .collapse-cta { text-align: right; }
+  .cta-num { font-family: var(--font-mono, monospace); font-size: 1.3rem; color: var(--ember, #c5583a); margin-bottom: 0.4rem; }
+  .collapse-btn {
+    background: var(--ember, #c5583a); color: var(--bg, #1d1610);
+    border: none; padding: 0.5rem 0.9rem; cursor: pointer; font-family: inherit;
+    letter-spacing: 0.06em; text-transform: uppercase; font-size: 0.8rem;
+  }
+  .collapse-btn:disabled { background: rgba(197,88,58,0.25); color: rgba(228,211,168,0.4); cursor: not-allowed; }
+
+  .legacy-nodes h3 { font-family: var(--font-display, serif); letter-spacing: 0.03em; margin-bottom: 0.6rem; }
+  .node { padding: 0.7rem 0.9rem; margin-bottom: 0.5rem; border: 1px solid rgba(212,161,58,0.2); border-radius: 4px; }
+  .node.owned { border-color: var(--gilt, #d4a13a); background: rgba(212,161,58,0.08); }
+  .node.locked { opacity: 0.45; }
+  .node-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.2rem; }
+  .node-cost { font-family: var(--font-mono, monospace); font-size: 0.85rem; color: var(--gilt, #d4a13a); }
+  .node-desc { font-size: 0.88rem; opacity: 0.85; margin-bottom: 0.3rem; }
+  .node-req { margin-bottom: 0.3rem; }
+  .node-buy {
+    background: transparent; border: 1px solid var(--gilt, #d4a13a); color: var(--gilt, #d4a13a);
+    padding: 0.3rem 0.7rem; cursor: pointer; font-family: inherit; font-size: 0.78rem;
+    letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .node-buy:hover:not(:disabled) { background: rgba(212,161,58,0.15); }
+  .node-buy:disabled { opacity: 0.4; cursor: not-allowed; }
 </style>

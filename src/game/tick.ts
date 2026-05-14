@@ -24,6 +24,18 @@ export function startLoop() {
       tickIndustrial(dt);
     }
 
+    // Track peaks for legacy calculation.
+    const after = get(game);
+    const pop = after.resources.pop ?? 0;
+    const output = after.resources.output ?? 0;
+    if (pop > (after.peakPop ?? 0) || output > (after.peakOutput ?? 0)) {
+      game.update(g => ({
+        ...g,
+        peakPop: Math.max(g.peakPop ?? 0, pop),
+        peakOutput: Math.max(g.peakOutput ?? 0, output),
+      }));
+    }
+
     if (now - lastSave > SAVE_EVERY_MS) {
       saveState(get(game));
       lastSave = now;
