@@ -2,6 +2,8 @@
   import { onMount, onDestroy } from 'svelte';
   import { game, logEvent } from './game/game';
   import { agrarianUpgrades, buyUpgrade, grainPerSec, grainCap, gatherGrain } from './game/eras/agrarian';
+  import { industrialUpgrades, buyIndustrialUpgrade, outputPerSec, grainDrainPerSec } from './game/eras/industrial';
+  import { projects, projectAvailable, canAffordProject, completeProject } from './game/projects';
   import { startLoop, stopLoop } from './game/tick';
   import { hydrate, resetGame } from './game/save';
 
@@ -25,6 +27,9 @@
   $: grainAmt = $game.resources.grain ?? 0;
   $: cap = grainCap($game);
   $: grainFull = grainAmt >= cap - 0.01;
+  $: outputAmt = $game.resources.output ?? 0;
+  $: availableProjects = projects.filter(p => projectAvailable(p, $game));
+  $: completedCount = Object.keys($game.completedProjects ?? {}).length;
 
   function hardReset() {
     if (confirm('Wipe save and restart?')) {
@@ -45,12 +50,27 @@
     <div class="res">
       <span class="label">Grain</span>
       <span class="val" class:full={grainFull}>{fmt(grainAmt)} / {fmt(cap)}</span>
-      <span class="rate">{grainFull ? 'storage full' : `+${fmt(grainPerSec($game))}/s`}</span>
+      <span class="rate">
+        {#if $game.era === 'industrial'}
+          {fmt(grainPerSec($game))}/s in, {fmt(grainDrainPerSec($game))}/s used
+        {:else if grainFull}
+          storage full
+        {:else}
+          +{fmt(grainPerSec($game))}/s
+        {/if}
+      </span>
     </div>
     <div class="res">
       <span class="label">Population</span>
       <span class="val">{Math.floor($game.resources.pop ?? 0)}</span>
     </div>
+    {#if $game.era === 'industrial'}
+      <div class="res">
+        <span class="label">Output</span>
+        <span class="val">{fmt(outputAmt)}</span>
+        <span class="rate">+{fmt(outputPerSec($game))}/s</span>
+      </div>
+    {/if}
   </section>
 
   <section class="action">
@@ -77,6 +97,61 @@
       </button>
     {/each}
   </section>
+
+  {#if $game.era === 'industrial'}
+    <section class="upgrades">
+      <h2>Industry</h2>
+      {#each industrialUpgrades as u}
+        {@const lvl = $game.upgrades[u.id] ?? 0}
+        {@const c = u.cost(lvl)}
+        {@const grainCostOk = c.grain === undefined || grainAmt >= c.grain}
+        {@const outputCostOk = c.output === undefined || outputAmt >= c.output}
+        <button
+          class="upgrade"
+          disabled={!grainCostOk || !outputCostOk}
+          on:click={() => buyIndustrialUpgrade(u.id)}
+        >
+          <div class="row">
+            <strong>{u.name}</strong>
+            <span class="lvl">Lv {lvl}</span>
+          </div>
+          <div class="desc">{u.desc}</div>
+          <div class="cost">
+            {c.grain !== undefined ? `${fmt(c.grain)} grain` : ''}
+            {c.output !== undefined ? ` ${fmt(c.output)} output` : ''}
+          </div>
+        </button>
+      {/each}
+    </section>
+  {/if}
+
+  {#if availableProjects.length > 0 || completedCount > 0}
+    <section class="projects">
+      <h2>Projects {completedCount > 0 ? `(${completedCount} complete)` : ''}</h2>
+      {#each availableProjects as p (p.id)}
+        {@const grainOk = p.cost.grain === undefined || grainAmt >= p.cost.grain}
+        {@const outputOk = p.cost.output === undefined || outputAmt >= p.cost.output}
+        {@const affordable = grainOk && outputOk}
+        <button
+          class="project"
+          disabled={!affordable}
+          on:click={() => completeProject(p.id)}
+        >
+          <div class="row">
+            <strong>{p.name}</strong>
+          </div>
+          <div class="desc">{p.desc}</div>
+          <div class="cost">
+            {p.cost.grain !== undefined ? `${fmt(p.cost.grain)} grain` : ''}
+            {p.cost.output !== undefined ? ` ${fmt(p.cost.output)} output` : ''}
+          </div>
+        </button>
+      {/each}
+      {#if availableProjects.length === 0}
+        <p class="empty">No new projects available. Keep building.</p>
+      {/if}
+    </section>
+  {/if}
 
   <section class="log">
     <h2>Log</h2>
@@ -143,6 +218,7 @@
     cursor: pointer;
   }
   .big:active { background: #2a4a2a; }
+  .projects h2,
   .upgrades h2, .log h2 {
     font-size: 0.85rem;
     text-transform: uppercase;
@@ -168,6 +244,21 @@
   .lvl { opacity: 0.6; font-size: 0.85rem; }
   .desc { font-size: 0.85rem; opacity: 0.75; margin: 0.25rem 0; }
   .cost { font-size: 0.85rem; color: #d4b87a; }
+  .project {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: #1d2225;
+    border: 1px solid #2f3a44;
+    color: inherit;
+    font: inherit;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+  }
+  .project:hover:not(:disabled) { border-color: #5a7a9a; background: #232a30; }
+  .project:disabled { opacity: 0.45; cursor: not-allowed; }
+  .empty { opacity: 0.5; font-size: 0.85rem; font-style: italic; }
   .log ul {
     list-style: none;
     padding: 0;

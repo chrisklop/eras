@@ -1,7 +1,8 @@
 import type { GameState } from './game';
 import { game, initialState } from './game';
 
-const KEY = 'eras:save:v1';
+const KEY = 'eras:save:v2';
+const OLD_KEYS = ['eras:save:v1'];
 
 export function saveState(s: GameState) {
   try {
@@ -13,12 +14,26 @@ export function saveState(s: GameState) {
 
 export function loadState(): GameState | null {
   try {
-    const raw = localStorage.getItem(KEY);
+    let raw = localStorage.getItem(KEY);
+    if (!raw) {
+      for (const k of OLD_KEYS) {
+        raw = localStorage.getItem(k);
+        if (raw) { localStorage.removeItem(k); break; }
+      }
+    }
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as GameState;
-    // Offline progress is intentionally not applied yet — comes in a later milestone.
-    parsed.lastTick = Date.now();
-    return parsed;
+    const parsed = JSON.parse(raw) as Partial<GameState>;
+    const migrated: GameState = {
+      era: parsed.era ?? 'agrarian',
+      resources: { grain: 0, land: 1, pop: 3, output: 0, ...(parsed.resources ?? {}) },
+      upgrades: { plow: 0, irrigation: 0, granary: 0, factory: 0, ...(parsed.upgrades ?? {}) },
+      flags: parsed.flags ?? {},
+      completedProjects: parsed.completedProjects ?? {},
+      log: parsed.log ?? [],
+      startedAt: parsed.startedAt ?? Date.now(),
+      lastTick: Date.now(),
+    };
+    return migrated;
   } catch {
     return null;
   }
