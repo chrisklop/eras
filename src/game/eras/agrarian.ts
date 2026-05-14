@@ -32,6 +32,15 @@ const BASE_POP_GROWTH = 0.3;
 const POP_GROWTH_PER_DWELLING = 0.1;
 const MAX_POP_GROWTH = 3;
 
+// Food consumption — base 0.3 grain/sec per citizen, multiplicatively reduced
+// by efficiency techs. See popConsumptionPerSec().
+const BASE_FOOD_PER_POP = 0.3;
+
+// Granary-based spoilage reduction: each granary cuts consumption by 0.5%,
+// capped at -40%. Multiplied with other tech reductions.
+const GRANARY_CONSUMPTION_REDUCTION_PER = 0.005;
+const GRANARY_CONSUMPTION_REDUCTION_MAX = 0.4;
+
 export interface Upgrade {
   id: string;
   name: string;
@@ -92,6 +101,27 @@ export function popGrowthPerSec(s: GameState = get(game)): number {
   return Math.min(MAX_POP_GROWTH, BASE_POP_GROWTH + POP_GROWTH_PER_DWELLING * dwellings + compassBoost);
 }
 
+/** Per-pop grain consumption per second, after all tech reductions. */
+export function consumptionPerPop(s: GameState = get(game)): number {
+  let mult = 1;
+  if (s.flags.pottery) mult *= 0.80;
+  if (s.flags.cropRotation) mult *= 0.85;
+  if (s.flags.writing) mult *= 0.75;
+  if (s.flags.threeField) mult *= 0.70;
+  if (s.flags.plowAgriculture) mult *= 0.80;
+  const granaries = s.upgrades.granary ?? 0;
+  const granaryRed = Math.min(
+    GRANARY_CONSUMPTION_REDUCTION_MAX,
+    granaries * GRANARY_CONSUMPTION_REDUCTION_PER,
+  );
+  mult *= 1 - granaryRed;
+  return BASE_FOOD_PER_POP * mult;
+}
+
+export function grainConsumedPerSec(s: GameState = get(game)): number {
+  return (s.resources.pop ?? 0) * consumptionPerPop(s);
+}
+
 export function grainPerSec(s: GameState = get(game)): number {
   const plows = s.upgrades.plow ?? 0;
   const irrig = s.upgrades.irrigation ?? 0;
@@ -117,27 +147,31 @@ export function buyUpgrade(id: string) {
   if (lvl === 0) logEvent(`First ${def.name.toLowerCase()} built.`);
 }
 
-function gainGrainCapped(amount: number) {
+function adjustGrain(delta: number) {
   const s = get(game);
   const cap = grainCap(s);
-  const next = Math.min(cap, (s.resources.grain ?? 0) + amount);
+  const next = Math.max(0, Math.min(cap, (s.resources.grain ?? 0) + delta));
   game.update(s => ({ ...s, resources: { ...s.resources, grain: next } }));
 }
 
 export function gatherGrain() {
-  gainGrainCapped(1);
+  adjustGrain(1);
 }
 
 export function tickAgrarian(dt: number) {
   const s = get(game);
-  gainGrainCapped(grainPerSec(s) * dt);
+  const production = grainPerSec(s);
+  const consumption = grainConsumedPerSec(s);
+  adjustGrain((production - consumption) * dt);
 
+  const grainCurrent = get(game).resources.grain ?? 0;
   const pop = s.resources.pop ?? 0;
-  const cap = popCap(s);
-  const fed = (s.resources.grain ?? 0) > 0;
-  if (fed && pop < cap) {
+  const popMax = popCap(s);
+  // Well-fed = positive net food flow AND non-empty grain stockpile.
+  const wellFed = production > consumption && grainCurrent > 0;
+  if (wellFed && pop < popMax) {
     const before = Math.floor(pop);
-    const next = Math.min(cap, pop + popGrowthPerSec(s) * dt);
+    const next = Math.min(popMax, pop + popGrowthPerSec(s) * dt);
     game.update(s2 => ({ ...s2, resources: { ...s2.resources, pop: next } }));
     const after = Math.floor(next);
     if (after > before && after % 10 === 0) {

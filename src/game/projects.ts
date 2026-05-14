@@ -45,6 +45,16 @@ export const projects: Project[] = [
     apply: s => ({ flags: { ...s.flags, pottery: true } }),
   },
   {
+    id: 'threeField',
+    name: 'Three-Field System',
+    desc: 'Rotate winter wheat, spring legumes, fallow. Citizens need 30% less grain.',
+    cost: { grain: 2000 },
+    era: 'agrarian',
+    requires: s => !!s.completedProjects.cropRotation,
+    requirementsText: 'Requires Crop Rotation',
+    apply: s => ({ flags: { ...s.flags, threeField: true } }),
+  },
+  {
     id: 'bronzeTools',
     name: 'Bronze Tools',
     desc: 'Cast harder blades. Plows produce 3× more.',
@@ -53,6 +63,16 @@ export const projects: Project[] = [
     requires: s => (s.upgrades.plow ?? 0) >= 12,
     requirementsText: 'Requires 12 plows',
     apply: s => ({ flags: { ...s.flags, bronzeTools: true } }),
+  },
+  {
+    id: 'plowAgriculture',
+    name: 'Plow Agriculture',
+    desc: 'Deep furrows, ox-drawn iron. Citizens need a further 20% less grain.',
+    cost: { grain: 8000 },
+    era: 'agrarian',
+    requires: s => !!s.completedProjects.bronzeTools,
+    requirementsText: 'Requires Bronze Tools',
+    apply: s => ({ flags: { ...s.flags, plowAgriculture: true } }),
   },
   {
     id: 'writing',
@@ -89,6 +109,55 @@ export const projects: Project[] = [
     apply: _s => ({ era: 'industrial' as EraId }),
     onComplete: () => {
       logEvent('Smoke rises. The age of grain ends.');
+    },
+  },
+
+  // ============================== Industrial era ==============================
+
+  {
+    id: 'massProduction',
+    name: 'Mass Production',
+    desc: 'Standard parts, assembly lines. Factories produce 2× output.',
+    cost: { output: 500 },
+    era: 'industrial',
+    requires: s => s.era === 'industrial' && (s.upgrades.factory ?? 0) >= 5,
+    requirementsText: 'Requires 5 factories',
+    apply: s => ({ flags: { ...s.flags, massProduction: true } }),
+  },
+  {
+    id: 'logistics',
+    name: 'Logistics',
+    desc: 'Ledgers, trains, schedules. Warehouses multiply storage instead of adding to it.',
+    cost: { output: 1500 },
+    era: 'industrial',
+    requires: s => s.era === 'industrial' && (s.upgrades.warehouse ?? 0) >= 2,
+    requirementsText: 'Requires 2 warehouses',
+    apply: s => ({ flags: { ...s.flags, logistics: true } }),
+  },
+  {
+    id: 'electricity',
+    name: 'Electricity',
+    desc: 'Wire the cities. Factory output doubles again.',
+    cost: { output: 10000 },
+    era: 'industrial',
+    requires: s => s.era === 'industrial' && !!s.completedProjects.massProduction && (s.upgrades.factory ?? 0) >= 15,
+    requirementsText: 'Requires Mass Production, 15 factories',
+    apply: s => ({ flags: { ...s.flags, electricity: true } }),
+  },
+  {
+    id: 'telegraph',
+    name: 'Telegraph',
+    desc: 'Instantaneous communication. Unlocks the next era.',
+    cost: { output: 100000 },
+    era: 'industrial',
+    requires: s =>
+      s.era === 'industrial' &&
+      !!s.completedProjects.electricity &&
+      !!s.completedProjects.logistics,
+    requirementsText: 'Requires Electricity, Logistics',
+    apply: _s => ({ era: 'information' as EraId }),
+    onComplete: () => {
+      logEvent('The wires hum. Information now travels faster than thought.');
     },
   },
 ];

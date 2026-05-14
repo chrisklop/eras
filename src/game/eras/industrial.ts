@@ -16,7 +16,25 @@
 // =============================================================================
 
 import { get } from 'svelte/store';
-import { game, spend, logEvent } from '../game';
+import { game, spend, logEvent, type GameState } from '../game';
+
+const FACTORY_BASE_COST = 500;
+const FACTORY_COST_GROWTH = 1.3;
+const FACTORY_GRAIN_DRAIN = 2;          // grain/sec/factory
+const FACTORY_OUTPUT_BASE = 1;          // output/sec/factory
+
+const WORKSHOP_BASE_COST = 2000;
+const WORKSHOP_COST_GROWTH = 1.25;      // each lvl: +20% factory output
+
+const WAREHOUSE_BASE_COST = 1500;       // in output
+const WAREHOUSE_COST_GROWTH = 1.35;
+
+const RAILROAD_BASE_COST = 5000;
+const RAILROAD_COST_GROWTH = 1.4;       // each lvl: -10% factory grain drain
+
+const BASE_OUTPUT_CAP = 100;
+const PRE_LOGISTICS_CAP_PER_WAREHOUSE = 200;
+const LOGISTICS_CAP_MULT = 1.5;         // post-Logistics paradigm shift
 
 export interface IndustrialUpgrade {
   id: string;
@@ -31,18 +49,59 @@ export const industrialUpgrades: IndustrialUpgrade[] = [
   {
     id: 'factory',
     name: 'Steam Factory',
-    desc: 'Consumes 2 grain/sec, produces 1 output/sec.',
-    cost: (lvl) => ({ grain: Math.ceil(500 * Math.pow(1.3, lvl)) }),
-    effect: '+1 output/sec',
+    desc: 'Burns grain to produce output.',
+    cost: (lvl) => ({ grain: Math.ceil(FACTORY_BASE_COST * Math.pow(FACTORY_COST_GROWTH, lvl)) }),
+    effect: '+1 output/sec, -2 grain/sec',
+  },
+  {
+    id: 'workshop',
+    name: 'Workshop',
+    desc: 'Tools, dies, jigs. Each level boosts factory output by +20%.',
+    cost: (lvl) => ({ grain: Math.ceil(WORKSHOP_BASE_COST * Math.pow(WORKSHOP_COST_GROWTH, lvl)) }),
+    effect: '+20% factory output',
+  },
+  {
+    id: 'warehouse',
+    name: 'Warehouse',
+    desc: 'Stores output. Pre-Logistics: +200 cap. Post-Logistics: ×1.5 cap each.',
+    cost: (lvl) => ({ output: Math.ceil(WAREHOUSE_BASE_COST * Math.pow(WAREHOUSE_COST_GROWTH, lvl)) }),
+    effect: '+output storage',
+  },
+  {
+    id: 'railroad',
+    name: 'Railroad',
+    desc: 'Move grain efficiently. Each level cuts factory grain demand by 10% (floor 30%).',
+    cost: (lvl) => ({ output: Math.ceil(RAILROAD_BASE_COST * Math.pow(RAILROAD_COST_GROWTH, lvl)) }),
+    effect: '-10% grain drain',
+    max: 7,
   },
 ];
 
-export function outputPerSec(s = get(game)): number {
-  return s.upgrades.factory ?? 0;
+export function outputCap(s: GameState = get(game)): number {
+  const warehouses = s.upgrades.warehouse ?? 0;
+  if (s.flags.logistics) {
+    return Math.floor(BASE_OUTPUT_CAP * Math.pow(LOGISTICS_CAP_MULT, warehouses));
+  }
+  return BASE_OUTPUT_CAP + PRE_LOGISTICS_CAP_PER_WAREHOUSE * warehouses;
 }
 
-export function grainDrainPerSec(s = get(game)): number {
-  return (s.upgrades.factory ?? 0) * 2;
+export function factoryOutputMult(s: GameState = get(game)): number {
+  const workshops = s.upgrades.workshop ?? 0;
+  const electricMult = s.flags.electricity ? 2 : 1;
+  return (1 + 0.2 * workshops) * electricMult;
+}
+
+export function factoryGrainMult(s: GameState = get(game)): number {
+  const railroads = Math.min(7, s.upgrades.railroad ?? 0);
+  return Math.max(0.3, 1 - 0.1 * railroads);
+}
+
+export function outputPerSec(s: GameState = get(game)): number {
+  return (s.upgrades.factory ?? 0) * FACTORY_OUTPUT_BASE * factoryOutputMult(s);
+}
+
+export function grainDrainPerSec(s: GameState = get(game)): number {
+  return (s.upgrades.factory ?? 0) * FACTORY_GRAIN_DRAIN * factoryGrainMult(s);
 }
 
 export function buyIndustrialUpgrade(id: string) {
@@ -66,18 +125,23 @@ export function tickIndustrial(dt: number) {
   const factories = s.upgrades.factory ?? 0;
   if (factories <= 0) return;
 
-  const grainNeeded = factories * 2 * dt;
+  const drainRate = grainDrainPerSec(s);
+  const outRate = outputPerSec(s);
+  const cap = outputCap(s);
+
+  const grainNeeded = drainRate * dt;
   const grainAvail = s.resources.grain ?? 0;
   const grainUsed = Math.min(grainNeeded, grainAvail);
-  const factoriesRunning = grainUsed / (2 * dt || 1);
-  const outputGained = factoriesRunning * dt;
+  const fraction = grainNeeded > 0 ? grainUsed / grainNeeded : 1;
+  const outputGained = outRate * dt * fraction;
+  const newOutput = Math.min(cap, (s.resources.output ?? 0) + outputGained);
 
   game.update(s => ({
     ...s,
     resources: {
       ...s.resources,
       grain: (s.resources.grain ?? 0) - grainUsed,
-      output: (s.resources.output ?? 0) + outputGained,
+      output: newOutput,
     },
   }));
 }

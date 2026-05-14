@@ -7,7 +7,7 @@
 //
 // Run: npx tsx scripts/sim.ts
 
-import { agrarianUpgrades, grainCap, popCap, popGrowthPerSec, grainPerSec } from '../src/game/eras/agrarian';
+import { agrarianUpgrades, grainCap, popCap, popGrowthPerSec, grainPerSec, grainConsumedPerSec } from '../src/game/eras/agrarian';
 import { projects, projectAvailable, canAffordProject } from '../src/game/projects';
 import { initialState, type GameState } from '../src/game/game';
 
@@ -37,12 +37,13 @@ function applyProject(s: GameState, projId: string) {
 
 function tick(s: GameState, dt: number) {
   const cap = grainCap(s);
-  const next = Math.min(cap, (s.resources.grain ?? 0) + grainPerSec(s) * dt);
-  s.resources.grain = next;
+  const net = grainPerSec(s) - grainConsumedPerSec(s);
+  s.resources.grain = Math.max(0, Math.min(cap, (s.resources.grain ?? 0) + net * dt));
 
   const pop = s.resources.pop ?? 0;
   const pCap = popCap(s);
-  if ((s.resources.grain ?? 0) > 0 && pop < pCap) {
+  const wellFed = grainPerSec(s) > grainConsumedPerSec(s) && (s.resources.grain ?? 0) > 0;
+  if (wellFed && pop < pCap) {
     s.resources.pop = Math.min(pCap, pop + popGrowthPerSec(s) * dt);
   }
 }
@@ -97,8 +98,11 @@ function simulate(): { phases: PhaseLog[]; violations: string[]; reachedIR: bool
   while (t < MAX_SIM_TIME_SEC) {
     t += TICK_DT;
 
-    // Manual clicks while grainPerSec is low (early game).
-    if (grainPerSec(s) < 1 && t - lastClickTime >= 1 / CLICK_RATE) {
+    // Manual clicks: real players keep clicking until production is comfortably
+    // ahead of consumption (net > 2/sec or 10+ plows built).
+    const netRate = grainPerSec(s) - grainConsumedPerSec(s);
+    const clicksHelpful = (s.upgrades.plow ?? 0) < 10 || netRate < 2;
+    if (clicksHelpful && t - lastClickTime >= 1 / CLICK_RATE) {
       lastClickTime = t;
       const cap = grainCap(s);
       s.resources.grain = Math.min(cap, (s.resources.grain ?? 0) + 1);

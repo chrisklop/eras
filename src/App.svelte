@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { game, logEvent } from './game/game';
-  import { agrarianUpgrades, buyUpgrade, grainPerSec, grainCap, popCap, gatherGrain } from './game/eras/agrarian';
-  import { industrialUpgrades, buyIndustrialUpgrade, outputPerSec, grainDrainPerSec } from './game/eras/industrial';
+  import { agrarianUpgrades, buyUpgrade, grainPerSec, grainConsumedPerSec, consumptionPerPop, grainCap, popCap, gatherGrain } from './game/eras/agrarian';
+  import { industrialUpgrades, buyIndustrialUpgrade, outputPerSec, grainDrainPerSec, outputCap } from './game/eras/industrial';
   import { projects, projectAvailable, projectIncomplete, completeProject } from './game/projects';
   import { startLoop, stopLoop } from './game/tick';
   import { hydrate, resetGame } from './game/save';
@@ -30,6 +30,10 @@
   $: outputAmt = $game.resources.output ?? 0;
   $: popAmt = $game.resources.pop ?? 0;
   $: popMax = popCap($game);
+  $: grainProduction = grainPerSec($game);
+  $: grainConsumption = grainConsumedPerSec($game);
+  $: grainNet = grainProduction - grainConsumption;
+  $: perPop = consumptionPerPop($game);
   $: visibleProjects = projects.filter(p => projectIncomplete(p, $game));
   $: completedCount = Object.keys($game.completedProjects ?? {}).length;
 
@@ -48,25 +52,27 @@
     <div class="resource-strip">
       <div class="res">
         <span class="label">Grain</span>
-        <span class="val" class:full={grainFull}>{fmt(grainAmt)} / {fmt(cap)}</span>
-        <span class="rate">
-          {#if $game.era === 'industrial'}
-            {fmt(grainPerSec($game))}/s in · {fmt(grainDrainPerSec($game))}/s out
-          {:else if grainFull}
-            storage full
-          {:else}
-            +{fmt(grainPerSec($game))}/s
-          {/if}
+        <span class="val" class:full={grainFull} class:starving={grainNet < 0 && grainAmt < 1}>
+          {fmt(grainAmt)} / {fmt(cap)}
+        </span>
+        <span class="rate" title={`Per citizen: ${perPop.toFixed(3)} grain/sec`}>
+          +{fmt(grainProduction)} − {fmt(grainConsumption)} = {grainNet >= 0 ? '+' : ''}{fmt(grainNet)}/s
         </span>
       </div>
       <div class="res">
         <span class="label">Population</span>
         <span class="val" class:full={popAmt >= popMax}>{Math.floor(popAmt)} / {popMax}</span>
+        <span class="rate">
+          {#if grainNet <= 0 && grainAmt < 1}underfed
+          {:else if popAmt >= popMax}housing full
+          {:else if grainNet > 0 && grainAmt > 0}growing
+          {:else}stable{/if}
+        </span>
       </div>
-      {#if $game.era === 'industrial'}
+      {#if $game.era === 'industrial' || $game.era === 'information'}
         <div class="res">
           <span class="label">Output</span>
-          <span class="val">{fmt(outputAmt)}</span>
+          <span class="val">{fmt(outputAmt)} / {fmt(outputCap($game))}</span>
           <span class="rate">+{fmt(outputPerSec($game))}/s</span>
         </div>
       {/if}
@@ -205,6 +211,7 @@
   .label { font-size: 0.7rem; opacity: 0.6; text-transform: uppercase; letter-spacing: 0.08em; }
   .val { font-size: 1.15rem; font-weight: bold; }
   .val.full { color: #d88a6a; }
+  .val.starving { color: #e44; }
   .rate { font-size: 0.75rem; opacity: 0.7; color: #a8d8a8; }
   .reset {
     margin-left: auto;
