@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { game, gain, logEvent } from './game/game';
-  import { agrarianUpgrades, buyUpgrade, grainPerSec } from './game/eras/agrarian';
+  import { game, logEvent } from './game/game';
+  import { agrarianUpgrades, buyUpgrade, grainPerSec, grainCap, gatherGrain } from './game/eras/agrarian';
   import { startLoop, stopLoop } from './game/tick';
   import { hydrate, resetGame } from './game/save';
 
@@ -12,7 +12,7 @@
   onDestroy(stopLoop);
 
   function gather() {
-    gain('grain', 1);
+    gatherGrain();
   }
 
   function fmt(n: number): string {
@@ -44,10 +44,13 @@
   </header>
 
   <section class="resources">
+    {@const grain = $game.resources.grain ?? 0}
+    {@const cap = grainCap($game)}
+    {@const full = grain >= cap - 0.01}
     <div class="res">
       <span class="label">Grain</span>
-      <span class="val">{fmt($game.resources.grain ?? 0)}</span>
-      <span class="rate">+{fmt(grainPerSec($game))}/s</span>
+      <span class="val" class:full>{fmt(grain)} / {fmt(cap)}</span>
+      <span class="rate">{full ? 'storage full' : `+${fmt(grainPerSec($game))}/s`}</span>
     </div>
     <div class="res">
       <span class="label">Population</span>
@@ -131,6 +134,7 @@
   .res { display: flex; flex-direction: column; }
   .label { font-size: 0.75rem; opacity: 0.6; text-transform: uppercase; }
   .val { font-size: 1.5rem; font-weight: bold; }
+  .val.full { color: #d88a6a; }
   .rate { font-size: 0.8rem; opacity: 0.7; color: #a8d8a8; }
   .action { margin-bottom: 1.5rem; }
   .big {

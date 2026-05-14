@@ -29,11 +29,18 @@ export const agrarianUpgrades: Upgrade[] = [
   {
     id: 'granary',
     name: 'Granary',
-    desc: 'Stores surplus; +1 population every 30s.',
+    desc: '+50 grain storage. Slowly grows population.',
     cost: (lvl) => ({ grain: Math.ceil(50 * Math.pow(1.4, lvl)) }),
-    effect: '+pop growth',
+    effect: '+50 cap',
   },
 ];
+
+const BASE_GRAIN_CAP = 75;
+const CAP_PER_GRANARY = 50;
+
+export function grainCap(s = get(game)): number {
+  return BASE_GRAIN_CAP + CAP_PER_GRANARY * (s.upgrades.granary ?? 0);
+}
 
 export function buyUpgrade(id: string) {
   const s = get(game);
@@ -56,9 +63,20 @@ export function grainPerSec(s = get(game)): number {
   return plows * Math.pow(2, irrig);
 }
 
+function gainGrainCapped(amount: number) {
+  const s = get(game);
+  const cap = grainCap(s);
+  const next = Math.min(cap, (s.resources.grain ?? 0) + amount);
+  game.update(s => ({ ...s, resources: { ...s.resources, grain: next } }));
+}
+
+export function gatherGrain() {
+  gainGrainCapped(1);
+}
+
 export function tickAgrarian(dt: number) {
   const s = get(game);
-  gain('grain', grainPerSec(s) * dt);
+  gainGrainCapped(grainPerSec(s) * dt);
 
   const granaries = s.upgrades.granary ?? 0;
   if (granaries > 0) {
