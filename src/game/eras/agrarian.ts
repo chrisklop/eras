@@ -56,7 +56,10 @@ const MAX_POP_GROWTH = 3;
 
 // Food consumption — base 0.3 grain/sec per citizen, multiplicatively reduced
 // by efficiency techs. See popConsumptionPerSec().
-const BASE_FOOD_PER_POP = 0.3;
+const BASE_FOOD_PER_POP = 0.15;
+// Pop only grows when there's a real surplus, not just a hair above zero net.
+// Prevents the "pop creeps up until they eat 99% of production" trap.
+const POP_GROWTH_SURPLUS_RATIO = 0.2;
 
 // Granary-based spoilage reduction: each granary cuts consumption by 0.5%,
 // capped at -40%. Multiplied with other tech reductions.
@@ -337,7 +340,10 @@ export function tickAgrarian(dt: number) {
   const pop = s.resources.pop ?? 0;
   const popMax = popCap(s);
   // Well-fed = positive net food flow AND non-empty grain stockpile.
-  const wellFed = production > consumption && grainCurrent > 0;
+  // Require a meaningful surplus, not just net > 0. Otherwise pop grows until
+  // they eat virtually all production and you can't stockpile.
+  const surplusNeeded = Math.max(0.5, consumption * POP_GROWTH_SURPLUS_RATIO);
+  const wellFed = production - consumption >= surplusNeeded && grainCurrent > 0;
   if (wellFed && pop < popMax) {
     const before = Math.floor(pop);
     const next = Math.min(popMax, pop + popGrowthPerSec(s) * dt);

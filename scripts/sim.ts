@@ -71,7 +71,8 @@ function tick(s: GameState, dt: number) {
 
   const pop = s.resources.pop ?? 0;
   const pCap = popCap(s);
-  const wellFed = grainProd > grainCons && (s.resources.grain ?? 0) > 0;
+  const surplusNeeded = Math.max(0.5, grainCons * 0.2);
+  const wellFed = grainProd - grainCons >= surplusNeeded && (s.resources.grain ?? 0) > 0;
   if (wellFed && pop < pCap) {
     s.resources.pop = Math.min(pCap, pop + popGrowthPerSec(s) * dt);
   }
