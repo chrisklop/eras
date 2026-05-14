@@ -9,17 +9,24 @@ import { game, spend, logEvent, type GameState } from '../game';
 // =============================================================================
 
 const PLOW_BASE_COST = 10;
-const PLOW_COST_GROWTH = 1.15;
+const PLOW_COST_GROWTH = 1.18;
+const PLOW_BASE_OUTPUT = 0.5;
 
 const IRRIGATION_BASE_COST = 100;
-const IRRIGATION_COST_GROWTH = 2.5;
-const IRRIGATION_MAX = 8;
+const IRRIGATION_COST_GROWTH = 2.2;
+const IRRIGATION_MAX = 5;
+const IRRIGATION_PER_LEVEL = 1.3;
 
 const GRANARY_BASE_COST = 30;
 const GRANARY_COST_GROWTH = 1.4;
 
 const DWELLING_BASE_COST = 20;
 const DWELLING_COST_GROWTH = 1.3;
+
+// Multiplier magnitudes — kept small to avoid pacing collapse.
+const CROP_ROTATION_MULT = 1.5;
+const BRONZE_TOOLS_MULT = 1.5;
+const WRITING_POP_OUTPUT = 0.2;
 
 const BASE_GRAIN_CAP = 50;
 const WATTLE_FENCES_BONUS = 75;
@@ -65,35 +72,42 @@ export interface Upgrade {
   max?: number;
 }
 
+/** Compute the grain cost for an upgrade at level `lvl`, given full game state. */
+export function agrarianCostAt(id: string, lvl: number, s: GameState = get(game)): number {
+  const curve = UPGRADE_CURVES[id];
+  if (!curve) return 0;
+  return Math.ceil(curve.base * Math.pow(curve.growth, lvl) * curve.mult(s));
+}
+
 export const agrarianUpgrades: Upgrade[] = [
   {
     id: 'plow',
     name: 'Wooden Plow',
-    desc: 'Auto-gather 1 grain/sec per plow.',
-    cost: (lvl) => ({ grain: Math.ceil(PLOW_BASE_COST * Math.pow(PLOW_COST_GROWTH, lvl)) }),
-    effect: '+1 grain/sec',
+    desc: 'Auto-gather grain. Cost scales with current plow efficiency.',
+    cost: (lvl) => ({ grain: agrarianCostAt('plow', lvl) }),
+    effect: '+grain/sec',
   },
   {
     id: 'irrigation',
     name: 'Irrigation Ditch',
-    desc: 'Each level doubles plow output.',
-    cost: (lvl) => ({ grain: Math.ceil(IRRIGATION_BASE_COST * Math.pow(IRRIGATION_COST_GROWTH, lvl)) }),
-    effect: '×2 plow output',
+    desc: 'Each level boosts plow output by 30%.',
+    cost: (lvl) => ({ grain: agrarianCostAt('irrigation', lvl) }),
+    effect: '×1.3 plow output',
     max: IRRIGATION_MAX,
   },
   {
     id: 'granary',
     name: 'Granary',
     desc: 'Stores grain. Pre-Pottery: +50 cap. Post-Pottery: ×1.5 cap each.',
-    cost: (lvl) => ({ grain: Math.ceil(GRANARY_BASE_COST * Math.pow(GRANARY_COST_GROWTH, lvl)) }),
+    cost: (lvl) => ({ grain: agrarianCostAt('granary', lvl) }),
     effect: '+storage',
   },
   {
     id: 'dwelling',
     name: 'Dwelling',
-    desc: 'A roof for five. +5 to population cap, faster growth.',
-    cost: (lvl) => ({ grain: Math.ceil(DWELLING_BASE_COST * Math.pow(DWELLING_COST_GROWTH, lvl)) }),
-    effect: '+5 pop cap',
+    desc: 'A roof for citizens. +pop cap; tier grows with tech.',
+    cost: (lvl) => ({ grain: agrarianCostAt('dwelling', lvl) }),
+    effect: '+pop cap',
   },
 ];
 
@@ -168,17 +182,20 @@ export function grainConsumedPerSec(s: GameState = get(game)): number {
   return (s.resources.pop ?? 0) * consumptionPerPop(s);
 }
 
+/** Multiplier applied to per-plow output AND to plow cost. */
+export function plowMultiplier(s: GameState = get(game)): number {
+  const irrig = s.upgrades.irrigation ?? 0;
+  const cropMult = s.flags.cropRotation ? CROP_ROTATION_MULT : 1;
+  const toolMult = s.flags.bronzeTools ? BRONZE_TOOLS_MULT : 1;
+  return Math.pow(IRRIGATION_PER_LEVEL, irrig) * cropMult * toolMult;
+}
+
 export function grainPerSec(s: GameState = get(game)): number {
   const plows = s.upgrades.plow ?? 0;
-  const irrig = s.upgrades.irrigation ?? 0;
-  const cropMult = s.flags.cropRotation ? 2 : 1;
-  const toolMult = s.flags.bronzeTools ? 3 : 1;
   const labor = laborFraction(s);
-  const plowOutput = plows * Math.pow(2, irrig) * cropMult * toolMult * labor;
-  // Pop's grain contribution: surplus workers (beyond plow demand) gather a
-  // little on their own. Writing gives all citizens a productivity boost.
+  const plowOutput = plows * PLOW_BASE_OUTPUT * plowMultiplier(s) * labor;
   const surplus = Math.max(0, (s.resources.pop ?? 0) - laborDemand(s));
-  const popBase = s.flags.writing ? 0.5 : 0.1;
+  const popBase = s.flags.writing ? WRITING_POP_OUTPUT : 0.05;
   const popOutput = surplus * popBase;
   return plowOutput + popOutput;
 }
@@ -240,20 +257,31 @@ export function nextAgrarianBulkCost(id: string, count: number | 'max', state?: 
   const max = effectiveMax(id, def, s);
   const grain = s.resources.grain ?? 0;
   const remaining = max !== undefined ? Math.max(0, max - lvl) : Infinity;
+  const effectiveBase = scaledBase(id, s);
   let n =
     count === 'max'
-      ? affordableCount(curve.base, curve.growth, lvl, grain, max)
+      ? affordableCount(effectiveBase, curve.growth, lvl, grain, max)
       : Math.min(count, remaining);
-  return { total: bulkCost(curve.base, curve.growth, lvl, n), n };
+  return { total: bulkCost(effectiveBase, curve.growth, lvl, n), n };
 }
 
-// Upgrade growth constants for bulk-buy lookups (mirror the table above).
-const UPGRADE_CURVES: Record<string, { base: number; growth: number; max?: number }> = {
-  plow:       { base: PLOW_BASE_COST,       growth: PLOW_COST_GROWTH },
-  irrigation: { base: IRRIGATION_BASE_COST, growth: IRRIGATION_COST_GROWTH, max: IRRIGATION_MAX },
-  granary:    { base: GRANARY_BASE_COST,    growth: GRANARY_COST_GROWTH },
-  dwelling:   { base: DWELLING_BASE_COST,   growth: DWELLING_COST_GROWTH },
+// Each upgrade's `mult` is the production multiplier applied to its output.
+// Costs are also scaled by this so that wait-time stays stable when multipliers
+// stack. Without this, multipliers collapse wait times (the bug we just fixed).
+const UPGRADE_CURVES: Record<
+  string,
+  { base: number; growth: number; max?: number; mult: (s: GameState) => number }
+> = {
+  plow:       { base: PLOW_BASE_COST,       growth: PLOW_COST_GROWTH,       mult: s => plowMultiplier(s) },
+  irrigation: { base: IRRIGATION_BASE_COST, growth: IRRIGATION_COST_GROWTH, max: IRRIGATION_MAX, mult: () => 1 },
+  granary:    { base: GRANARY_BASE_COST,    growth: GRANARY_COST_GROWTH,    mult: () => 1 },
+  dwelling:   { base: DWELLING_BASE_COST,   growth: DWELLING_COST_GROWTH,   mult: () => 1 },
 };
+
+function scaledBase(id: string, s: GameState): number {
+  const curve = UPGRADE_CURVES[id];
+  return curve.base * curve.mult(s);
+}
 
 export function buyUpgrade(id: string, count: number | 'max' = 1) {
   const s = get(game);
@@ -265,15 +293,15 @@ export function buyUpgrade(id: string, count: number | 'max' = 1) {
   if (max !== undefined && lvl >= max) return;
   const remaining = max !== undefined ? max - lvl : Infinity;
   const grain = s.resources.grain ?? 0;
+  const effectiveBase = scaledBase(id, s);
   let n =
     count === 'max'
-      ? affordableCount(curve.base, curve.growth, lvl, grain, max)
+      ? affordableCount(effectiveBase, curve.growth, lvl, grain, max)
       : Math.min(count, remaining);
   if (n <= 0) return;
-  // Clamp to what's actually affordable.
-  while (n > 0 && bulkCost(curve.base, curve.growth, lvl, n) > grain) n--;
+  while (n > 0 && bulkCost(effectiveBase, curve.growth, lvl, n) > grain) n--;
   if (n <= 0) return;
-  const total = bulkCost(curve.base, curve.growth, lvl, n);
+  const total = bulkCost(effectiveBase, curve.growth, lvl, n);
   if (!spend('grain', total)) return;
   game.update(s => ({
     ...s,

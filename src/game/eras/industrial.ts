@@ -20,26 +20,31 @@ import { game, spend, logEvent, type GameState } from '../game';
 import { bulkCost, affordableCount, popFactoryMultiplier, laborFraction } from './agrarian';
 
 const FACTORY_BASE_COST = 1500;
-const FACTORY_COST_GROWTH = 1.3;
-const FACTORY_GRAIN_DRAIN = 2;          // grain/sec/factory (food for workers)
-const FACTORY_COAL_DRAIN = 1;           // coal/sec/factory once Bessemer flag set
-const FACTORY_OUTPUT_BASE = 1;          // output/sec/factory (×3 with Bessemer)
+const FACTORY_COST_GROWTH = 1.4;
+const FACTORY_GRAIN_DRAIN = 2;
+const FACTORY_COAL_DRAIN = 1;
+const FACTORY_OUTPUT_BASE = 0.5;
+const BESSEMER_MULT = 1.8;
+const MASS_PRODUCTION_MULT = 1.5;
+const ELECTRICITY_MULT = 1.5;
+const WORKSHOP_PER_LEVEL = 1.15;
 
 const WORKSHOP_BASE_COST = 6000;
-const WORKSHOP_COST_GROWTH = 1.25;
+const WORKSHOP_COST_GROWTH = 1.3;
 
-const WAREHOUSE_BASE_COST = 2500;       // in grain
-const WAREHOUSE_COST_GROWTH = 1.35;
+const WAREHOUSE_BASE_COST = 2500;
+const WAREHOUSE_COST_GROWTH = 1.4;
 
-const RAILROAD_BASE_COST = 1500;        // in output
+const RAILROAD_BASE_COST = 1500;
 const RAILROAD_COST_GROWTH = 1.4;
 
-const MINE_BASE_COST = 2000;            // in grain
-const MINE_COST_GROWTH = 1.28;
-const COAL_PER_MINE = 1;                // coal/sec/mine
+const MINE_BASE_COST = 2000;
+const MINE_COST_GROWTH = 1.32;
+const COAL_PER_MINE = 1;
+const STEEL_MILLS_MULT = 1.8;
 
-const COAL_YARD_BASE_COST = 1500;       // in grain
-const COAL_YARD_COST_GROWTH = 1.32;
+const COAL_YARD_BASE_COST = 1500;
+const COAL_YARD_COST_GROWTH = 1.4;
 const BASE_COAL_CAP = 200;
 const COAL_PER_YARD_PRE = 150;          // linear pre-Refining
 const COAL_YARD_CAP_MULT = 1.5;         // post-Refining paradigm shift
@@ -121,15 +126,24 @@ export function coalCap(s: GameState = get(game)): number {
 
 export function coalPerSec(s: GameState = get(game)): number {
   const labor = laborFraction(s);
-  return (s.upgrades.mine ?? 0) * COAL_PER_MINE * (s.flags.steelMills ? 2 : 1) * labor;
+  return (s.upgrades.mine ?? 0) * COAL_PER_MINE * mineStaticMult(s) * labor;
+}
+
+/** Static factory multiplier (no labor — used for cost scaling). */
+export function factoryStaticMult(s: GameState = get(game)): number {
+  const workshops = s.upgrades.workshop ?? 0;
+  const electric = s.flags.electricity ? ELECTRICITY_MULT : 1;
+  const massProd = s.flags.massProduction ? MASS_PRODUCTION_MULT : 1;
+  const bessemer = s.flags.bessemer ? BESSEMER_MULT : 1;
+  return Math.pow(WORKSHOP_PER_LEVEL, workshops) * electric * massProd * bessemer;
+}
+
+export function mineStaticMult(s: GameState = get(game)): number {
+  return s.flags.steelMills ? STEEL_MILLS_MULT : 1;
 }
 
 export function factoryOutputMult(s: GameState = get(game)): number {
-  const workshops = s.upgrades.workshop ?? 0;
-  const electricMult = s.flags.electricity ? 2 : 1;
-  const massProdMult = s.flags.massProduction ? 2 : 1;
-  const bessemerMult = s.flags.bessemer ? 3 : 1;
-  return (1 + 0.2 * workshops) * electricMult * massProdMult * bessemerMult * popFactoryMultiplier(s);
+  return factoryStaticMult(s) * popFactoryMultiplier(s);
 }
 
 export function factoryGrainMult(s: GameState = get(game)): number {
@@ -145,6 +159,15 @@ export function coalDrainPerSec(s: GameState = get(game)): number {
 export function outputPerSec(s: GameState = get(game)): number {
   return (s.upgrades.factory ?? 0) * FACTORY_OUTPUT_BASE * factoryOutputMult(s);
 }
+
+const INDUSTRIAL_MULTS: Record<string, (s: GameState) => number> = {
+  factory:   s => factoryStaticMult(s),
+  mine:      s => mineStaticMult(s),
+  workshop:  () => 1,
+  warehouse: () => 1,
+  coalYard:  () => 1,
+  railroad:  () => 1,
+};
 
 export function grainDrainPerSec(s: GameState = get(game)): number {
   return (s.upgrades.factory ?? 0) * FACTORY_GRAIN_DRAIN * factoryGrainMult(s);
@@ -164,6 +187,12 @@ const INDUSTRIAL_CURVES: Record<
   railroad:  { base: RAILROAD_BASE_COST,   growth: RAILROAD_COST_GROWTH,   payRes: 'output', max: 7 },
 };
 
+function industrialScaledBase(id: string, s: GameState): number {
+  const curve = INDUSTRIAL_CURVES[id];
+  const m = INDUSTRIAL_MULTS[id] ? INDUSTRIAL_MULTS[id](s) : 1;
+  return curve.base * m;
+}
+
 export function buyIndustrialUpgrade(id: string, count: number | 'max' = 1) {
   const s = get(game);
   const def = industrialUpgrades.find(u => u.id === id);
@@ -173,14 +202,15 @@ export function buyIndustrialUpgrade(id: string, count: number | 'max' = 1) {
   if (def.max !== undefined && lvl >= def.max) return;
   const remaining = def.max !== undefined ? def.max - lvl : Infinity;
   const available = s.resources[curve.payRes] ?? 0;
+  const effectiveBase = industrialScaledBase(id, s);
   let n =
     count === 'max'
-      ? affordableCount(curve.base, curve.growth, lvl, available, def.max)
+      ? affordableCount(effectiveBase, curve.growth, lvl, available, def.max)
       : Math.min(count, remaining);
   if (n <= 0) return;
-  while (n > 0 && bulkCost(curve.base, curve.growth, lvl, n) > available) n--;
+  while (n > 0 && bulkCost(effectiveBase, curve.growth, lvl, n) > available) n--;
   if (n <= 0) return;
-  const total = bulkCost(curve.base, curve.growth, lvl, n);
+  const total = bulkCost(effectiveBase, curve.growth, lvl, n);
   if (!spend(curve.payRes, total)) return;
   game.update(s => ({
     ...s,
@@ -196,11 +226,12 @@ export function nextBulkCost(id: string, count: number | 'max', state?: GameStat
   const lvl = s.upgrades[id] ?? 0;
   const def = industrialUpgrades.find(u => u.id === id)!;
   const available = s.resources[curve.payRes] ?? 0;
+  const effectiveBase = industrialScaledBase(id, s);
   let n =
     count === 'max'
-      ? affordableCount(curve.base, curve.growth, lvl, available, def.max)
+      ? affordableCount(effectiveBase, curve.growth, lvl, available, def.max)
       : Math.min(count, def.max !== undefined ? def.max - lvl : Infinity);
-  return { total: bulkCost(curve.base, curve.growth, lvl, n), n, res: curve.payRes };
+  return { total: bulkCost(effectiveBase, curve.growth, lvl, n), n, res: curve.payRes };
 }
 
 export function tickIndustrial(dt: number) {

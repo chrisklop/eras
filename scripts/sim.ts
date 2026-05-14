@@ -13,7 +13,10 @@ import { projects, projectAvailable, canAffordProject } from '../src/game/projec
 import { initialState, type GameState } from '../src/game/game';
 
 const TICK_DT = 0.1; // sim resolution: 100ms steps
-const MAX_SIM_TIME_SEC = 4 * 60 * 60; // bail after 4 simulated hours
+const MAX_SIM_TIME_SEC = 8 * 60 * 60; // bail after 8 simulated hours
+// Skip dumb buys: don't buy if wait time would exceed this many seconds.
+// A real player saves for bigger purchases instead.
+const SKIP_WAIT_OVER_SEC = 180;
 
 function clone(s: GameState): GameState {
   return JSON.parse(JSON.stringify(s));
@@ -179,7 +182,8 @@ function simulate(): { phases: PhaseLog[]; violations: string[]; reachedIR: bool
       return { phases, violations, reachedIR: false, finalState: s, elapsed: t };
     }
 
-    // Greedy buy: find cheapest affordable upgrade across Agrarian + Industrial.
+    // Smarter buy: pick the cheapest affordable upgrade. Skip if it'd be
+    // sized so we should be saving for something bigger (cost > 30% of cap).
     type BuyOpt = { id: string; cost: number; res: 'grain' | 'output'; era: 'agrarian' | 'industrial'; name: string };
     let bestUpgrade: BuyOpt | null = null;
     const considerSet = (upgrades: typeof agrarianUpgrades, era: 'agrarian' | 'industrial') => {
@@ -190,7 +194,8 @@ function simulate(): { phases: PhaseLog[]; violations: string[]; reachedIR: bool
         const cost = c.grain ?? c.output ?? 0;
         const res: 'grain' | 'output' = c.grain !== undefined ? 'grain' : 'output';
         const have = res === 'grain' ? grain : output;
-        if (cost <= have && (!bestUpgrade || cost < bestUpgrade.cost)) {
+        if (cost > have) continue;
+        if (!bestUpgrade || cost < bestUpgrade.cost) {
           bestUpgrade = { id: u.id, cost, res, era, name: u.name };
         }
       }
