@@ -94,9 +94,9 @@ export const agrarianUpgrades: Upgrade[] = [
   {
     id: 'irrigation',
     name: 'Irrigation Ditch',
-    desc: 'Each level boosts plow output by 30%.',
+    desc: 'Each level boosts plow yield by 30%.',
     cost: (lvl) => ({ grain: agrarianCostAt('irrigation', lvl) }),
-    effect: '×1.3 plow output',
+    effect: '×1.3 plow yield',
     max: IRRIGATION_MAX,
   },
   {

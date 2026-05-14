@@ -40,7 +40,7 @@ export interface LegacyNode {
 
 export const LEGACY_NODES: LegacyNode[] = [
   { id: 'oralTradition',  name: 'Oral Tradition',   cost: 1,  desc: 'Begin each run with 12 grain instead of 0.' },
-  { id: 'ancestralTools', name: 'Ancestral Tools',  cost: 3,  desc: '+10% plow output, applied multiplicatively.' },
+  { id: 'ancestralTools', name: 'Ancestral Tools',  cost: 3,  desc: '+10% plow yield, applied multiplicatively.' },
   { id: 'folkMemory',     name: 'Folk Memory',      cost: 6,  desc: '−10% on all project costs.' },
   { id: 'stoneGranaries', name: 'Stone Granaries',  cost: 10, desc: '+50% base grain storage cap.' },
   { id: 'bloodlines',     name: 'Bloodlines',       cost: 15, desc: '+0.1/sec base population growth.' },

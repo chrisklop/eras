@@ -48,7 +48,7 @@ export const projects: Project[] = [
   {
     id: 'cropRotation',
     name: 'Crop Rotation',
-    desc: 'Alternate fields to keep the soil alive. Plows produce 2× base output.',
+    desc: 'Alternate fields to keep the soil alive. Plows produce 2× base yield.',
     cost: { grain: 300 },
     era: 'agrarian',
     requires: s => (s.upgrades.irrigation ?? 0) >= 2,
