@@ -33,7 +33,7 @@ const WORKSHOP_BASE_COST = 6000;
 const WORKSHOP_COST_GROWTH = 1.3;
 
 const WAREHOUSE_BASE_COST = 2500;
-const WAREHOUSE_COST_GROWTH = 1.4;
+const WAREHOUSE_COST_GROWTH = 1.25;
 
 const RAILROAD_BASE_COST = 1500;
 const RAILROAD_COST_GROWTH = 1.4;
@@ -44,13 +44,13 @@ const COAL_PER_MINE = 1;
 const STEEL_MILLS_MULT = 1.8;
 
 const COAL_YARD_BASE_COST = 1500;
-const COAL_YARD_COST_GROWTH = 1.4;
+const COAL_YARD_COST_GROWTH = 1.25;
 const BASE_COAL_CAP = 200;
-const COAL_PER_YARD_PRE = 150;          // linear pre-Refining
+const COAL_PER_YARD_PRE = 300;          // linear pre-Refining
 const COAL_YARD_CAP_MULT = 1.5;         // post-Refining paradigm shift
 
 const BASE_OUTPUT_CAP = 400;
-const PRE_LOGISTICS_CAP_PER_WAREHOUSE = 200;
+const PRE_LOGISTICS_CAP_PER_WAREHOUSE = 400;
 const LOGISTICS_CAP_MULT = 1.5;
 
 export interface IndustrialUpgrade {
@@ -129,13 +129,18 @@ export function coalPerSec(s: GameState = get(game)): number {
   return (s.upgrades.mine ?? 0) * COAL_PER_MINE * mineStaticMult(s) * labor;
 }
 
-/** Static factory multiplier (no labor — used for cost scaling). */
+/** Full multiplier on factory output (workshops + project flags). */
 export function factoryStaticMult(s: GameState = get(game)): number {
   const workshops = s.upgrades.workshop ?? 0;
+  return Math.pow(WORKSHOP_PER_LEVEL, workshops) * factoryCostMult(s);
+}
+
+/** Bounded cost multiplier — project flags only, no level compounding. */
+export function factoryCostMult(s: GameState = get(game)): number {
   const electric = s.flags.electricity ? ELECTRICITY_MULT : 1;
   const massProd = s.flags.massProduction ? MASS_PRODUCTION_MULT : 1;
   const bessemer = s.flags.bessemer ? BESSEMER_MULT : 1;
-  return Math.pow(WORKSHOP_PER_LEVEL, workshops) * electric * massProd * bessemer;
+  return electric * massProd * bessemer;
 }
 
 export function mineStaticMult(s: GameState = get(game)): number {
@@ -161,8 +166,8 @@ export function outputPerSec(s: GameState = get(game)): number {
 }
 
 const INDUSTRIAL_MULTS: Record<string, (s: GameState) => number> = {
-  factory:   s => factoryStaticMult(s),
-  mine:      s => mineStaticMult(s),
+  factory:   s => factoryCostMult(s),   // flag-only, bounded
+  mine:      s => mineStaticMult(s),    // flag-only already
   workshop:  () => 1,
   warehouse: () => 1,
   coalYard:  () => 1,

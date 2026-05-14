@@ -182,12 +182,18 @@ export function grainConsumedPerSec(s: GameState = get(game)): number {
   return (s.resources.pop ?? 0) * consumptionPerPop(s);
 }
 
-/** Multiplier applied to per-plow output AND to plow cost. */
+/** Full multiplier on per-plow output (includes level-stacked irrigation). */
 export function plowMultiplier(s: GameState = get(game)): number {
   const irrig = s.upgrades.irrigation ?? 0;
+  return Math.pow(IRRIGATION_PER_LEVEL, irrig) * plowCostMultiplier(s);
+}
+
+/** Bounded multiplier used for cost scaling (project flags only — no level
+ *  compounding, or cost would outrun grain cap. See sim notes 2026-05-14. */
+export function plowCostMultiplier(s: GameState = get(game)): number {
   const cropMult = s.flags.cropRotation ? CROP_ROTATION_MULT : 1;
   const toolMult = s.flags.bronzeTools ? BRONZE_TOOLS_MULT : 1;
-  return Math.pow(IRRIGATION_PER_LEVEL, irrig) * cropMult * toolMult;
+  return cropMult * toolMult;
 }
 
 export function grainPerSec(s: GameState = get(game)): number {
@@ -272,7 +278,7 @@ const UPGRADE_CURVES: Record<
   string,
   { base: number; growth: number; max?: number; mult: (s: GameState) => number }
 > = {
-  plow:       { base: PLOW_BASE_COST,       growth: PLOW_COST_GROWTH,       mult: s => plowMultiplier(s) },
+  plow:       { base: PLOW_BASE_COST,       growth: PLOW_COST_GROWTH,       mult: s => plowCostMultiplier(s) },
   irrigation: { base: IRRIGATION_BASE_COST, growth: IRRIGATION_COST_GROWTH, max: IRRIGATION_MAX, mult: () => 1 },
   granary:    { base: GRANARY_BASE_COST,    growth: GRANARY_COST_GROWTH,    mult: () => 1 },
   dwelling:   { base: DWELLING_BASE_COST,   growth: DWELLING_COST_GROWTH,   mult: () => 1 },
