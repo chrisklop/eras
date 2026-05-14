@@ -1,5 +1,5 @@
 import { get } from 'svelte/store';
-import { game, spend, gain, logEvent } from '../game';
+import { game, spend, logEvent } from '../game';
 
 export interface Upgrade {
   id: string;
@@ -29,16 +29,31 @@ export const agrarianUpgrades: Upgrade[] = [
   {
     id: 'granary',
     name: 'Granary',
-    desc: '+50 grain storage. Slowly grows population.',
-    cost: (lvl) => ({ grain: Math.ceil(50 * Math.pow(1.4, lvl)) }),
+    desc: '+50 grain storage.',
+    cost: (lvl) => ({ grain: Math.ceil(50 * Math.pow(1.12, lvl)) }),
     effect: '+50 cap',
   },
+  {
+    id: 'dwelling',
+    name: 'Dwelling',
+    desc: 'A roof for five. +5 to population cap.',
+    cost: (lvl) => ({ grain: Math.ceil(25 * Math.pow(1.18, lvl)) }),
+    effect: '+5 pop cap',
+  },
 ];
+
+const BASE_POP_CAP = 10;
+const POP_PER_DWELLING = 5;
+const POP_GROWTH_PER_SEC = 0.5;
+
+export function popCap(s = get(game)): number {
+  return BASE_POP_CAP + POP_PER_DWELLING * (s.upgrades.dwelling ?? 0);
+}
 
 const BASE_GRAIN_CAP = 75;
 
 export function grainCap(s = get(game)): number {
-  const perGranary = s.flags.pottery ? 100 : 50;
+  const perGranary = s.flags.pottery ? 150 : 50;
   const base = BASE_GRAIN_CAP + (s.flags.wattleFences ? 75 : 0);
   return base + perGranary * (s.upgrades.granary ?? 0);
 }
@@ -83,15 +98,16 @@ export function tickAgrarian(dt: number) {
   const s = get(game);
   gainGrainCapped(grainPerSec(s) * dt);
 
-  const granaries = s.upgrades.granary ?? 0;
-  if (granaries > 0) {
-    const popPerSec = granaries / 30;
-    const before = Math.floor(s.resources.pop);
-    gain('pop', popPerSec * dt);
-    const after = Math.floor(get(game).resources.pop);
+  const pop = s.resources.pop ?? 0;
+  const cap = popCap(s);
+  const fed = (s.resources.grain ?? 0) > 0;
+  if (fed && pop < cap) {
+    const before = Math.floor(pop);
+    const next = Math.min(cap, pop + POP_GROWTH_PER_SEC * dt);
+    game.update(s => ({ ...s, resources: { ...s.resources, pop: next } }));
+    const after = Math.floor(next);
     if (after > before && after % 10 === 0) {
       logEvent(`Population reaches ${after}.`);
     }
   }
-
 }

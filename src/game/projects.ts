@@ -8,6 +8,7 @@ export interface Project {
   cost: { grain?: number; output?: number };
   era: EraId | 'any';
   requires: (s: GameState) => boolean;
+  requirementsText: string;
   apply: (s: GameState) => Partial<GameState>;
   onComplete?: () => void;
 }
@@ -20,6 +21,7 @@ export const projects: Project[] = [
     cost: { grain: 30 },
     era: 'agrarian',
     requires: s => (s.upgrades.plow ?? 0) >= 3,
+    requirementsText: 'Requires 3 plows',
     apply: s => ({ flags: { ...s.flags, wattleFences: true } }),
   },
   {
@@ -29,6 +31,7 @@ export const projects: Project[] = [
     cost: { grain: 200 },
     era: 'agrarian',
     requires: s => (s.upgrades.irrigation ?? 0) >= 2,
+    requirementsText: 'Requires 2 irrigation ditches',
     apply: s => ({ flags: { ...s.flags, cropRotation: true } }),
   },
   {
@@ -38,6 +41,7 @@ export const projects: Project[] = [
     cost: { grain: 150 },
     era: 'agrarian',
     requires: s => (s.upgrades.granary ?? 0) >= 1,
+    requirementsText: 'Requires 1 granary',
     apply: s => ({ flags: { ...s.flags, pottery: true } }),
   },
   {
@@ -47,6 +51,7 @@ export const projects: Project[] = [
     cost: { grain: 800 },
     era: 'agrarian',
     requires: s => (s.upgrades.plow ?? 0) >= 12,
+    requirementsText: 'Requires 12 plows',
     apply: s => ({ flags: { ...s.flags, bronzeTools: true } }),
   },
   {
@@ -56,6 +61,7 @@ export const projects: Project[] = [
     cost: { grain: 1500 },
     era: 'agrarian',
     requires: s => (s.resources.pop ?? 0) >= 30,
+    requirementsText: 'Requires 30 population',
     apply: s => ({ flags: { ...s.flags, writing: true } }),
   },
   {
@@ -68,6 +74,7 @@ export const projects: Project[] = [
       !!s.completedProjects.bronzeTools &&
       !!s.completedProjects.writing &&
       (s.resources.pop ?? 0) >= 80,
+    requirementsText: 'Requires Bronze Tools, Writing, 80 population',
     apply: _s => ({ era: 'industrial' as EraId }),
     onComplete: () => {
       logEvent('Smoke rises. The age of grain ends.');
@@ -78,6 +85,10 @@ export const projects: Project[] = [
 export function projectAvailable(p: Project, s: GameState): boolean {
   if (s.completedProjects[p.id]) return false;
   return p.requires(s);
+}
+
+export function projectIncomplete(p: Project, s: GameState): boolean {
+  return !s.completedProjects[p.id];
 }
 
 export function canAffordProject(p: Project, s: GameState): boolean {

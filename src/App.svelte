@@ -1,9 +1,9 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { game, logEvent } from './game/game';
-  import { agrarianUpgrades, buyUpgrade, grainPerSec, grainCap, gatherGrain } from './game/eras/agrarian';
+  import { agrarianUpgrades, buyUpgrade, grainPerSec, grainCap, popCap, gatherGrain } from './game/eras/agrarian';
   import { industrialUpgrades, buyIndustrialUpgrade, outputPerSec, grainDrainPerSec } from './game/eras/industrial';
-  import { projects, projectAvailable, canAffordProject, completeProject } from './game/projects';
+  import { projects, projectAvailable, projectIncomplete, completeProject } from './game/projects';
   import { startLoop, stopLoop } from './game/tick';
   import { hydrate, resetGame } from './game/save';
 
@@ -28,7 +28,9 @@
   $: cap = grainCap($game);
   $: grainFull = grainAmt >= cap - 0.01;
   $: outputAmt = $game.resources.output ?? 0;
-  $: availableProjects = projects.filter(p => projectAvailable(p, $game));
+  $: popAmt = $game.resources.pop ?? 0;
+  $: popMax = popCap($game);
+  $: visibleProjects = projects.filter(p => projectIncomplete(p, $game));
   $: completedCount = Object.keys($game.completedProjects ?? {}).length;
 
   function hardReset() {
@@ -62,7 +64,10 @@
     </div>
     <div class="res">
       <span class="label">Population</span>
-      <span class="val">{Math.floor($game.resources.pop ?? 0)}</span>
+      <span class="val">{Math.floor(popAmt)} / {popMax}</span>
+      {#if popAmt >= popMax}
+        <span class="rate" style="color:#d88a6a">housing full</span>
+      {/if}
     </div>
     {#if $game.era === 'industrial'}
       <div class="res">
@@ -125,31 +130,33 @@
     </section>
   {/if}
 
-  {#if availableProjects.length > 0 || completedCount > 0}
+  {#if visibleProjects.length > 0 || completedCount > 0}
     <section class="projects">
       <h2>Projects {completedCount > 0 ? `(${completedCount} complete)` : ''}</h2>
-      {#each availableProjects as p (p.id)}
+      {#each visibleProjects as p (p.id)}
+        {@const unlocked = projectAvailable(p, $game)}
         {@const grainOk = p.cost.grain === undefined || grainAmt >= p.cost.grain}
         {@const outputOk = p.cost.output === undefined || outputAmt >= p.cost.output}
         {@const affordable = grainOk && outputOk}
         <button
           class="project"
-          disabled={!affordable}
+          class:locked={!unlocked}
+          disabled={!unlocked || !affordable}
           on:click={() => completeProject(p.id)}
         >
           <div class="row">
-            <strong>{p.name}</strong>
+            <strong>{unlocked ? p.name : '???'}</strong>
+            {#if !unlocked}<span class="locked-tag">locked</span>{/if}
           </div>
-          <div class="desc">{p.desc}</div>
+          <div class="desc">{unlocked ? p.desc : p.requirementsText}</div>
           <div class="cost">
-            {p.cost.grain !== undefined ? `${fmt(p.cost.grain)} grain` : ''}
-            {p.cost.output !== undefined ? ` ${fmt(p.cost.output)} output` : ''}
+            {#if unlocked}
+              {p.cost.grain !== undefined ? `${fmt(p.cost.grain)} grain` : ''}
+              {p.cost.output !== undefined ? ` ${fmt(p.cost.output)} output` : ''}
+            {/if}
           </div>
         </button>
       {/each}
-      {#if availableProjects.length === 0}
-        <p class="empty">No new projects available. Keep building.</p>
-      {/if}
     </section>
   {/if}
 
@@ -258,6 +265,9 @@
   }
   .project:hover:not(:disabled) { border-color: #5a7a9a; background: #232a30; }
   .project:disabled { opacity: 0.45; cursor: not-allowed; }
+  .project.locked { background: #18191a; border-style: dashed; border-color: #3a3a3a; }
+  .project.locked .desc { font-style: italic; opacity: 0.7; }
+  .locked-tag { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.6; }
   .empty { opacity: 0.5; font-size: 0.85rem; font-style: italic; }
   .log ul {
     list-style: none;
