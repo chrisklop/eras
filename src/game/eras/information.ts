@@ -12,6 +12,7 @@
 import { get } from 'svelte/store';
 import { game, spend, logEvent, type GameState } from '../game';
 import { bulkCost, affordableCount, laborFraction } from './agrarian';
+import { insightProdAchMult } from '../achievements';
 
 const STATION_BASE_COST = 80000;            // paid in goods
 const STATION_COST_GROWTH = 1.25;
@@ -133,7 +134,7 @@ export function insightPerSec(s: GameState = get(game)): number {
   const pubEd = s.flags.publicEducation
     ? (Math.max(0, (s.resources.pop ?? 0) - laborInfoDemand(s))) * 0.05
     : 0;
-  return stations * STATION_INSIGHT_BASE * stationStaticMult(s) * labor + pubEd;
+  return (stations * STATION_INSIGHT_BASE * stationStaticMult(s) * labor + pubEd) * insightProdAchMult();
 }
 
 const INFORMATION_MULTS: Record<string, (s: GameState) => number> = {

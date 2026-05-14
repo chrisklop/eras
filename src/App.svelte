@@ -19,10 +19,13 @@
     collapse,
     hydrateLegacy,
   } from './game/legacy';
+  import { achievements, ACHIEVEMENTS, hydrateAchievements } from './game/achievements';
 
   let showLegacy = false;
+  let showAchievements = false;
 
   onMount(() => {
+    hydrateAchievements();
     hydrateLegacy();
     hydrate();
     startLoop();
@@ -200,6 +203,10 @@
         </div>
       {/if}
     </div>
+    <button class="legacy-chip" on:click={() => (showAchievements = true)} title="Open Achievements panel">
+      <span class="legacy-label">Achievements</span>
+      <span class="legacy-val">{Object.keys($achievements.earned).length} / {ACHIEVEMENTS.length}</span>
+    </button>
     <button class="legacy-chip" on:click={() => (showLegacy = true)} title="Open Legacy panel">
       <span class="legacy-label">Legacy</span>
       <span class="legacy-val">{$legacy.points}</span>
@@ -265,6 +272,33 @@
                   {#if !avail}locked{:else if !affordable}need {n.cost - $legacy.points} more{:else}acquire{/if}
                 </button>
               {/if}
+            </div>
+          {/each}
+        </section>
+      </div>
+    </div>
+  {/if}
+
+  {#if showAchievements}
+    <div class="modal-backdrop" on:click={() => (showAchievements = false)}>
+      <div class="modal" on:click|stopPropagation>
+        <header class="modal-head">
+          <h2>Achievements</h2>
+          <button class="close" on:click={() => (showAchievements = false)}>×</button>
+        </header>
+        <div class="legacy-summary">
+          <div><strong>{Object.keys($achievements.earned).length}</strong> <span class="dim">/ {ACHIEVEMENTS.length} earned</span></div>
+          <div class="dim small">Each achievement grants a small permanent buff (+1% production, +0.01/s pop, or +5% legacy gain).</div>
+        </div>
+        <section class="legacy-nodes">
+          {#each ACHIEVEMENTS as a (a.id)}
+            {@const earned = !!$achievements.earned[a.id]}
+            <div class="node" class:owned={earned}>
+              <div class="node-head">
+                <strong>{earned ? a.name : '???'}</strong>
+                <span class="node-cost">{earned ? 'earned' : a.buff}</span>
+              </div>
+              <div class="node-desc">{a.desc}</div>
             </div>
           {/each}
         </section>

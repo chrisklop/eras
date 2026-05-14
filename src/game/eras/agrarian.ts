@@ -1,6 +1,7 @@
 import { get } from 'svelte/store';
 import { game, spend, logEvent, type GameState } from '../game';
 import { legacyPlowMultiplier, legacyGrainCapMultiplier, legacyPopGrowthBonus } from '../legacy';
+import { grainProdAchMult, popGrowthAchBonus } from '../achievements';
 
 // =============================================================================
 // Cost & cap constants — single source of truth.
@@ -139,7 +140,7 @@ export function popGrowthPerSec(s: GameState = get(game)): number {
   const dwellings = s.upgrades.dwelling ?? 0;
   const compassBoost = s.flags.compass ? 0.5 : 0;
   const wonderBoost = s.flags.stonehenge ? 0.5 : 0;
-  return Math.min(MAX_POP_GROWTH, BASE_POP_GROWTH + POP_GROWTH_PER_DWELLING * dwellings + compassBoost + legacyPopGrowthBonus() + wonderBoost);
+  return Math.min(MAX_POP_GROWTH, BASE_POP_GROWTH + POP_GROWTH_PER_DWELLING * dwellings + compassBoost + legacyPopGrowthBonus() + wonderBoost + popGrowthAchBonus());
 }
 
 // Labor demand — every building needs workers from population.
@@ -213,7 +214,7 @@ export function grainPerSec(s: GameState = get(game)): number {
   const surplus = Math.max(0, (s.resources.pop ?? 0) - laborDemand(s));
   const popBase = s.flags.writing ? WRITING_POP_OUTPUT : 0.05;
   const popOutput = surplus * popBase;
-  return plowOutput + popOutput;
+  return (plowOutput + popOutput) * grainProdAchMult();
 }
 
 /**

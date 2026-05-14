@@ -4,6 +4,7 @@ import { tickAgrarian } from './eras/agrarian';
 import { tickIndustrial } from './eras/industrial';
 import { tickInformation } from './eras/information';
 import { saveState } from './save';
+import { checkAchievements } from './achievements';
 
 const TICK_MS = 100;
 const SAVE_EVERY_MS = 5000;
@@ -39,6 +40,8 @@ export function startLoop() {
         peakOutput: Math.max(g.peakOutput ?? 0, output),
       }));
     }
+
+    checkAchievements();
 
     if (now - lastSave > SAVE_EVERY_MS) {
       saveState(get(game));

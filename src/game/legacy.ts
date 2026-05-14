@@ -1,5 +1,6 @@
 import { writable, get } from 'svelte/store';
 import { game, initialState, logEvent, type GameState } from './game';
+import { legacyGainAchMult } from './achievements';
 
 // =============================================================================
 // Legacy / Prestige
@@ -121,7 +122,7 @@ export function legacyPopGrowthBonus(l: LegacyState = get(legacy)): number {
 export function collapse(): { earned: number; total: number } | null {
   const s = get(game);
   if (!canCollapse(s)) return null;
-  const earned = legacyEarnedAt(s.peakPop ?? 0, s.peakOutput ?? 0);
+  const earned = Math.floor(legacyEarnedAt(s.peakPop ?? 0, s.peakOutput ?? 0) * legacyGainAchMult());
   legacy.update(x => ({
     ...x,
     points: x.points + earned,

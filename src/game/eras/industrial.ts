@@ -18,6 +18,7 @@
 import { get } from 'svelte/store';
 import { game, spend, logEvent, type GameState } from '../game';
 import { bulkCost, affordableCount, popFactoryMultiplier, laborFraction } from './agrarian';
+import { goodsProdAchMult } from '../achievements';
 
 const FACTORY_BASE_COST = 1500;
 const FACTORY_COST_GROWTH = 1.25;
@@ -178,7 +179,7 @@ export function coalDrainPerSec(s: GameState = get(game)): number {
 }
 
 export function outputPerSec(s: GameState = get(game)): number {
-  return (s.upgrades.factory ?? 0) * FACTORY_OUTPUT_BASE * factoryOutputMult(s);
+  return (s.upgrades.factory ?? 0) * FACTORY_OUTPUT_BASE * factoryOutputMult(s) * goodsProdAchMult();
 }
 
 const INDUSTRIAL_MULTS: Record<string, (s: GameState) => number> = {
