@@ -201,7 +201,7 @@
           <div class="row">
             <div>
               <div class="dim small">This civilization</div>
-              <div>Peak pop {Math.floor(peakPop)} · peak output {fmt(peakOutput)}</div>
+              <div>Peak pop {Math.floor(peakPop)} · peak goods {fmt(peakOutput)}</div>
             </div>
             <div class="collapse-cta">
               <div class="dim small">Collapse for</div>
