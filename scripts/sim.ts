@@ -9,6 +9,7 @@
 
 import { agrarianUpgrades, grainCap, popCap, popGrowthPerSec, grainPerSec, grainConsumedPerSec } from '../src/game/eras/agrarian';
 import { industrialUpgrades, outputCap, outputPerSec, grainDrainPerSec, coalCap, coalPerSec, coalDrainPerSec } from '../src/game/eras/industrial';
+import { informationUpgrades, insightCap, insightPerSec, stationGoodsDrainPerSec } from '../src/game/eras/information';
 import { projects, projectAvailable, canAffordProject } from '../src/game/projects';
 import { initialState, type GameState } from '../src/game/game';
 
@@ -47,7 +48,7 @@ function tick(s: GameState, dt: number) {
   let grainDelta = (grainProd - grainCons) * dt;
 
   // Industrial: mines → coal; factories drain grain (+ coal) → produce output
-  if (s.era === 'industrial' || s.era === 'information') {
+  if (s.era === 'industrial' || s.era === 'information' || s.era === 'algorithmic') {
     // Coal production from mines
     const cCap = coalCap(s);
     s.resources.coal = Math.min(cCap, (s.resources.coal ?? 0) + coalPerSec(s) * dt);
@@ -65,6 +66,19 @@ function tick(s: GameState, dt: number) {
       s.resources.coal = Math.max(0, coalAvail - coalNeeded * fraction);
       const oCap = outputCap(s);
       s.resources.output = Math.min(oCap, (s.resources.output ?? 0) + outputPerSec(s) * dt * fraction);
+    }
+  }
+
+  // Information: signal stations drain goods → produce insight
+  if (s.era === 'information' || s.era === 'algorithmic') {
+    const stations = s.upgrades.signalStation ?? 0;
+    if (stations > 0) {
+      const goodsNeeded = stationGoodsDrainPerSec(s) * dt;
+      const goodsAvail = s.resources.output ?? 0;
+      const f = goodsNeeded > 0 ? Math.min(1, goodsAvail / goodsNeeded) : 1;
+      s.resources.output = Math.max(0, goodsAvail - goodsNeeded * f);
+      const iCap = insightCap(s);
+      s.resources.insight = Math.min(iCap, (s.resources.insight ?? 0) + insightPerSec(s) * dt * f);
     }
   }
   s.resources.grain = Math.max(0, Math.min(cap, (s.resources.grain ?? 0) + grainDelta));
@@ -149,7 +163,7 @@ function simulate(): { phases: PhaseLog[]; violations: string[]; reachedIR: bool
       applyProject(s, p.id);
       logPhase(`project: ${p.name}`);
       lastPurchaseTime = t;
-      if (p.id === 'telegraph') {
+      if (p.id === 'theInternet') {
         return { phases, violations, reachedIR: true, finalState: s, elapsed: t };
       }
       continue;
@@ -185,16 +199,19 @@ function simulate(): { phases: PhaseLog[]; violations: string[]; reachedIR: bool
 
     // Smarter buy: pick the cheapest affordable upgrade. Skip if it'd be
     // sized so we should be saving for something bigger (cost > 30% of cap).
-    type BuyOpt = { id: string; cost: number; res: 'grain' | 'output'; era: 'agrarian' | 'industrial'; name: string };
+    type BuyOpt = { id: string; cost: number; res: 'grain' | 'output' | 'insight'; era: 'agrarian' | 'industrial' | 'information'; name: string };
     let bestUpgrade: BuyOpt | null = null;
-    const considerSet = (upgrades: typeof agrarianUpgrades, era: 'agrarian' | 'industrial') => {
+    const insightAmt = s.resources.insight ?? 0;
+    const considerSet = (upgrades: any[], era: 'agrarian' | 'industrial' | 'information') => {
       for (const u of upgrades) {
         const lvl = s.upgrades[u.id] ?? 0;
-        if (u.max !== undefined && lvl >= u.max) continue;
+        const maxVal = u.max;
+        if (maxVal !== undefined && lvl >= maxVal) continue;
         const c = u.cost(lvl);
-        const cost = c.grain ?? c.output ?? 0;
-        const res: 'grain' | 'output' = c.grain !== undefined ? 'grain' : 'output';
-        const have = res === 'grain' ? grain : output;
+        const cost = c.grain ?? c.output ?? c.goods ?? c.insight ?? 0;
+        const resRaw = c.grain !== undefined ? 'grain' : c.output !== undefined ? 'output' : c.goods !== undefined ? 'output' : 'insight';
+        const res = resRaw as 'grain' | 'output' | 'insight';
+        const have = res === 'grain' ? grain : res === 'output' ? output : insightAmt;
         if (cost > have) continue;
         if (!bestUpgrade || cost < bestUpgrade.cost) {
           bestUpgrade = { id: u.id, cost, res, era, name: u.name };
@@ -202,8 +219,11 @@ function simulate(): { phases: PhaseLog[]; violations: string[]; reachedIR: bool
       }
     };
     considerSet(agrarianUpgrades, 'agrarian');
-    if (s.era === 'industrial' || s.era === 'information') {
+    if (s.era === 'industrial' || s.era === 'information' || s.era === 'algorithmic') {
       considerSet(industrialUpgrades as any, 'industrial');
+    }
+    if (s.era === 'information' || s.era === 'algorithmic') {
+      considerSet(informationUpgrades as any, 'information');
     }
 
     if (bestUpgrade) {

@@ -6,7 +6,7 @@ export interface Project {
   id: string;
   name: string;
   desc: string;
-  cost: { grain?: number; output?: number };
+  cost: { grain?: number; output?: number; insight?: number };
   era: EraId | 'any';
   requires: (s: GameState) => boolean;
   requirementsText: string;
@@ -258,6 +258,93 @@ export const projects: Project[] = [
       logEvent('The wires hum. Information now travels faster than thought.');
     },
     visible: s => !!s.completedProjects.electricity && !!s.completedProjects.logistics,
+  },
+
+  // ============================== Information era ==============================
+
+  {
+    id: 'movableType',
+    name: 'Movable Type',
+    desc: 'Reusable letterforms. Archives now multiply Insight storage by ×1.5 instead of adding a flat bit. Paradigm shift.',
+    cost: { insight: 600 },
+    era: 'information',
+    requires: s => s.era === 'information' && (s.upgrades.archive ?? 0) >= 1,
+    requirementsText: 'Requires 1 archive',
+    apply: s => ({ flags: { ...s.flags, movableType: true } }),
+    visible: s => s.era === 'information' && (s.upgrades.signalStation ?? 0) >= 1,
+  },
+  {
+    id: 'telegraphNetwork',
+    name: 'Telegraph Network',
+    desc: 'Wire the continents. Signal stations produce 1.8× Insight.',
+    cost: { insight: 2000 },
+    era: 'information',
+    requires: s => s.era === 'information' && (s.upgrades.signalStation ?? 0) >= 2,
+    requirementsText: 'Requires 2 signal stations',
+    apply: s => ({ flags: { ...s.flags, telegraphNetwork: true } }),
+    visible: s => s.era === 'information' && (s.upgrades.signalStation ?? 0) >= 1,
+  },
+  {
+    id: 'publicEducation',
+    name: 'Public Education',
+    desc: 'Literate citizenry. Idle population produces 0.05 Insight/sec each.',
+    cost: { insight: 8000 },
+    era: 'information',
+    requires: s => s.era === 'information' && !!s.completedProjects.telegraphNetwork && (s.resources.pop ?? 0) >= 500,
+    requirementsText: 'Requires Telegraph Network, 500 population',
+    apply: s => ({ flags: { ...s.flags, publicEducation: true } }),
+    visible: s => !!s.completedProjects.telegraphNetwork,
+  },
+  {
+    id: 'mechanicalComputing',
+    name: 'Mechanical Computing',
+    desc: 'Gears, punched cards, tabulators. Signal stations produce 1.5× Insight.',
+    cost: { insight: 25000 },
+    era: 'information',
+    requires: s => s.era === 'information' && !!s.completedProjects.telegraphNetwork && (s.upgrades.signalStation ?? 0) >= 4,
+    requirementsText: 'Requires Telegraph Network, 4 stations',
+    apply: s => ({ flags: { ...s.flags, mechanicalComputing: true } }),
+    visible: s => !!s.completedProjects.telegraphNetwork,
+  },
+  {
+    id: 'massCommunications',
+    name: 'Mass Communications',
+    desc: 'Phone lines, switching. Wire Networks expand to a max of 14 levels.',
+    cost: { insight: 15000 },
+    era: 'information',
+    requires: s => s.era === 'information' && (s.upgrades.wireNetwork ?? 0) >= 5,
+    requirementsText: 'Requires 5 wire networks',
+    apply: s => ({ flags: { ...s.flags, massCommunications: true } }),
+    visible: s => s.era === 'information' && (s.upgrades.wireNetwork ?? 0) >= 3,
+  },
+  {
+    id: 'radio',
+    name: 'Radio',
+    desc: 'Broadcast over the air. Signal stations produce another 1.5× Insight.',
+    cost: { insight: 60000 },
+    era: 'information',
+    requires: s => s.era === 'information' && !!s.completedProjects.mechanicalComputing && (s.upgrades.signalStation ?? 0) >= 8,
+    requirementsText: 'Requires Mechanical Computing, 8 stations',
+    apply: s => ({ flags: { ...s.flags, radio: true } }),
+    visible: s => !!s.completedProjects.mechanicalComputing,
+  },
+  {
+    id: 'theInternet',
+    name: 'The Internet',
+    desc: 'Packet-switched everything. Begin the next era.',
+    cost: { insight: 400000 },
+    era: 'information',
+    requires: s =>
+      s.era === 'information' &&
+      !!s.completedProjects.radio &&
+      !!s.completedProjects.publicEducation &&
+      (s.upgrades.signalStation ?? 0) >= 12,
+    requirementsText: 'Requires Radio, Public Education, 12 stations',
+    apply: _s => ({ era: 'algorithmic' as EraId }),
+    onComplete: () => {
+      logEvent('A network of networks awakens. The age of code begins.');
+    },
+    visible: s => !!s.completedProjects.radio,
   },
 ];
 

@@ -17,8 +17,8 @@ export interface GameState {
 
 export const initialState: GameState = {
   era: 'agrarian',
-  resources: { grain: 0, land: 1, pop: 3, output: 0, coal: 0 },
-  upgrades: { plow: 0, irrigation: 0, granary: 0, factory: 0, mine: 0, coalYard: 0 },
+  resources: { grain: 0, land: 1, pop: 3, output: 0, coal: 0, insight: 0 },
+  upgrades: { plow: 0, irrigation: 0, granary: 0, factory: 0, mine: 0, coalYard: 0, signalStation: 0, archive: 0, printingPress: 0, wireNetwork: 0 },
   flags: {},
   completedProjects: {},
   log: ['A small settlement gathers by the river.'],

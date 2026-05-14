@@ -3,6 +3,7 @@
   import { game, logEvent, buyMode, type BuyMode } from './game/game';
   import { agrarianUpgrades, buyUpgrade, nextAgrarianBulkCost, grainPerSec, grainConsumedPerSec, consumptionPerPop, grainCap, popCap, gatherGrain, currentHousingTier, dwellingMaxLevel, laborDemand, laborFraction } from './game/eras/agrarian';
   import { industrialUpgrades, buyIndustrialUpgrade, nextBulkCost, outputPerSec, grainDrainPerSec, outputCap, coalCap, coalPerSec, coalDrainPerSec } from './game/eras/industrial';
+  import { informationUpgrades, informationUpgradeVisible, buyInformationUpgrade, nextInfoBulkCost, insightPerSec, insightCap, stationGoodsDrainPerSec } from './game/eras/information';
   import { projects, projectAvailable, projectIncomplete, projectVisible, completeProject, effectiveProjectCost } from './game/projects';
   import { industrialUpgradeVisible } from './game/eras/industrial';
   import { startLoop, stopLoop } from './game/tick';
@@ -73,6 +74,8 @@
   $: perPop = consumptionPerPop($game);
   $: visibleProjects = projects.filter(p => projectVisible(p, $game));
   $: visibleIndustrialUpgrades = industrialUpgrades.filter(u => industrialUpgradeVisible(u, $game));
+  $: visibleInformationUpgrades = informationUpgrades.filter(u => informationUpgradeVisible(u, $game));
+  $: insightAmt = $game.resources.insight ?? 0;
   $: laborDemandVal = laborDemand($game);
   $: laborFractionVal = laborFraction($game);
   $: idleWorkers = Math.max(0, Math.floor(popAmt - laborDemandVal));
@@ -90,25 +93,30 @@
   }
 
   /** Find the nearest locked project for a given era — the "horizon". */
+  function projectCostScalar(p: typeof projects[number]): number {
+    return p.cost.grain ?? p.cost.output ?? p.cost.insight ?? 0;
+  }
   function nextHorizon(era: 'agrarian' | 'industrial' | 'information') {
     const locked = projects.filter(p =>
       projectIncomplete(p, $game) &&
       !projectAvailable(p, $game) &&
       (p.era === era || (p.era === 'agrarian' && era === 'agrarian'))
     );
-    // If no locked projects, look at unlocked-but-unaffordable as next horizon.
     if (locked.length === 0) {
       const unaffordable = projects.filter(p =>
         projectIncomplete(p, $game) &&
         projectAvailable(p, $game) &&
         p.era === era
-      ).sort((a, b) => (a.cost.grain ?? a.cost.output ?? 0) - (b.cost.grain ?? b.cost.output ?? 0));
+      ).sort((a, b) => projectCostScalar(a) - projectCostScalar(b));
       return unaffordable[0] ?? null;
     }
-    return locked.sort((a, b) => (a.cost.grain ?? a.cost.output ?? 0) - (b.cost.grain ?? b.cost.output ?? 0))[0];
+    return locked.sort((a, b) => projectCostScalar(a) - projectCostScalar(b))[0];
   }
 
-  $: upgradesHorizon = nextHorizon($game.era === 'industrial' || $game.era === 'information' ? 'industrial' : 'agrarian');
+  $: upgradesHorizon = nextHorizon(
+    $game.era === 'information' ? 'information' :
+    $game.era === 'industrial' ? 'industrial' : 'agrarian'
+  );
 
   function hardReset() {
     if (confirm('Wipe save and restart? (Legacy points are kept — use the Legacy panel to wipe those.)')) {
@@ -174,7 +182,19 @@
         <div class="res">
           <span class="label">Goods</span>
           <span class="val">{fmt(outputAmt)} / {fmt(outputCap($game))}</span>
-          <span class="rate">+{fmt(outputPerSec($game))}/s</span>
+          {#if $game.era === 'information'}
+            {@const goodsDrain = stationGoodsDrainPerSec($game)}
+            <span class="rate">+{fmt(outputPerSec($game))} − {fmt(goodsDrain)} = {outputPerSec($game) - goodsDrain >= 0 ? '+' : ''}{fmt(outputPerSec($game) - goodsDrain)}/s</span>
+          {:else}
+            <span class="rate">+{fmt(outputPerSec($game))}/s</span>
+          {/if}
+        </div>
+      {/if}
+      {#if $game.era === 'information'}
+        <div class="res">
+          <span class="label">Insight</span>
+          <span class="val">{fmt(insightAmt)} / {fmt(insightCap($game))}</span>
+          <span class="rate">+{fmt(insightPerSec($game))}/s</span>
         </div>
       {/if}
     </div>
@@ -258,9 +278,9 @@
       </button>
 
       {#if upgradesHorizon}
-        {@const horCost = upgradesHorizon.cost.grain ?? upgradesHorizon.cost.output ?? 0}
-        {@const horRes = upgradesHorizon.cost.grain !== undefined ? 'grain' : 'goods'}
-        {@const horHave = horRes === 'grain' ? grainAmt : outputAmt}
+        {@const horCost = upgradesHorizon.cost.grain ?? upgradesHorizon.cost.output ?? upgradesHorizon.cost.insight ?? 0}
+        {@const horRes = upgradesHorizon.cost.grain !== undefined ? 'grain' : upgradesHorizon.cost.output !== undefined ? 'goods' : 'insight'}
+        {@const horHave = horRes === 'grain' ? grainAmt : horRes === 'goods' ? outputAmt : insightAmt}
         {@const horPct = Math.max(0, Math.min(1, horHave / horCost))}
         <div class="horizon">
           <div class="horizon-fill" style="width: {horPct * 100}%"></div>
@@ -354,6 +374,41 @@
           {/each}
         </div>
       {/if}
+
+      {#if $game.era === 'information'}
+        <div class="pane-head">
+          <h2 class="sub">Wires & Signal</h2>
+        </div>
+        <div class="card-grid">
+          {#each visibleInformationUpgrades as u}
+            {@const lvl = $game.upgrades[u.id] ?? 0}
+            {@const max = u.max}
+            {@const maxed = max !== undefined && lvl >= max}
+            {@const bulk = nextInfoBulkCost(u.id, $buyMode, $game)}
+            {@const have = bulk.res === 'goods' ? outputAmt : insightAmt}
+            {@const buyable = !maxed && bulk.n > 0 && have >= bulk.total}
+            <button
+              class="upgrade"
+              disabled={!buyable}
+              style="--fill: {Math.max(0, Math.min(1, have / Math.max(1, bulk.total))) * 100}%"
+              on:click={() => buyInformationUpgrade(u.id, $buyMode)}
+            >
+              <div class="row">
+                <strong>{u.name}</strong>
+                <span class="lvl">× {lvl}{max ? ` / ${max}` : ''}</span>
+              </div>
+              <div class="desc">{u.desc}</div>
+              <div class="cost">
+                {#if maxed}maxed
+                {:else if bulk.n === 0}—
+                {:else}
+                  buy {bulk.n} · {fmt(bulk.total)} {bulk.res}
+                {/if}
+              </div>
+            </button>
+          {/each}
+        </div>
+      {/if}
     </section>
 
     <section class="pane projects-pane">
@@ -369,7 +424,8 @@
         {@const eff = effectiveProjectCost(p)}
         {@const grainOk = eff.grain === undefined || grainAmt >= eff.grain}
         {@const outputOk = eff.output === undefined || outputAmt >= eff.output}
-        {@const affordable = grainOk && outputOk}
+        {@const insightOk = eff.insight === undefined || insightAmt >= eff.insight}
+        {@const affordable = grainOk && outputOk && insightOk}
         <button
           class="project"
           class:locked={!unlocked}
@@ -385,6 +441,7 @@
             {#if unlocked}
               {eff.grain !== undefined ? `${fmt(eff.grain)} grain` : ''}
               {eff.output !== undefined ? ` ${fmt(eff.output)} goods` : ''}
+              {eff.insight !== undefined ? ` ${fmt(eff.insight)} insight` : ''}
             {/if}
           </div>
         </button>

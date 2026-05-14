@@ -144,12 +144,14 @@ export function popGrowthPerSec(s: GameState = get(game)): number {
 const WORKERS_PER_PLOW = 1;
 const WORKERS_PER_MINE = 2;
 const WORKERS_PER_FACTORY = 5;
+const WORKERS_PER_STATION = 8;
 
 export function laborDemand(s: GameState = get(game)): number {
   return (
     (s.upgrades.plow ?? 0) * WORKERS_PER_PLOW +
     (s.upgrades.mine ?? 0) * WORKERS_PER_MINE +
-    (s.upgrades.factory ?? 0) * WORKERS_PER_FACTORY
+    (s.upgrades.factory ?? 0) * WORKERS_PER_FACTORY +
+    (s.upgrades.signalStation ?? 0) * WORKERS_PER_STATION
   );
 }
 

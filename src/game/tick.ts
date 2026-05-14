@@ -2,6 +2,7 @@ import { get } from 'svelte/store';
 import { game } from './game';
 import { tickAgrarian } from './eras/agrarian';
 import { tickIndustrial } from './eras/industrial';
+import { tickInformation } from './eras/information';
 import { saveState } from './save';
 
 const TICK_MS = 100;
@@ -20,8 +21,11 @@ export function startLoop() {
 
     // Agrarian systems keep running in later eras (grain still flows).
     tickAgrarian(dt);
-    if (s.era === 'industrial') {
+    if (s.era === 'industrial' || s.era === 'information' || s.era === 'algorithmic') {
       tickIndustrial(dt);
+    }
+    if (s.era === 'information' || s.era === 'algorithmic') {
+      tickInformation(dt);
     }
 
     // Track peaks for legacy calculation.
