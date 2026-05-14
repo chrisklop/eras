@@ -41,98 +41,97 @@
   }
 </script>
 
-<main>
-  <header>
+<div class="app">
+  <header class="topbar">
     <h1>Eras</h1>
     <span class="era">— {$game.era}</span>
+    <div class="resource-strip">
+      <div class="res">
+        <span class="label">Grain</span>
+        <span class="val" class:full={grainFull}>{fmt(grainAmt)} / {fmt(cap)}</span>
+        <span class="rate">
+          {#if $game.era === 'industrial'}
+            {fmt(grainPerSec($game))}/s in · {fmt(grainDrainPerSec($game))}/s out
+          {:else if grainFull}
+            storage full
+          {:else}
+            +{fmt(grainPerSec($game))}/s
+          {/if}
+        </span>
+      </div>
+      <div class="res">
+        <span class="label">Population</span>
+        <span class="val" class:full={popAmt >= popMax}>{Math.floor(popAmt)} / {popMax}</span>
+      </div>
+      {#if $game.era === 'industrial'}
+        <div class="res">
+          <span class="label">Output</span>
+          <span class="val">{fmt(outputAmt)}</span>
+          <span class="rate">+{fmt(outputPerSec($game))}/s</span>
+        </div>
+      {/if}
+    </div>
     <button class="reset" on:click={hardReset}>reset</button>
   </header>
 
-  <section class="resources">
-    <div class="res">
-      <span class="label">Grain</span>
-      <span class="val" class:full={grainFull}>{fmt(grainAmt)} / {fmt(cap)}</span>
-      <span class="rate">
-        {#if $game.era === 'industrial'}
-          {fmt(grainPerSec($game))}/s in, {fmt(grainDrainPerSec($game))}/s used
-        {:else if grainFull}
-          storage full
-        {:else}
-          +{fmt(grainPerSec($game))}/s
-        {/if}
-      </span>
-    </div>
-    <div class="res">
-      <span class="label">Population</span>
-      <span class="val">{Math.floor(popAmt)} / {popMax}</span>
-      {#if popAmt >= popMax}
-        <span class="rate" style="color:#d88a6a">housing full</span>
-      {/if}
-    </div>
-    {#if $game.era === 'industrial'}
-      <div class="res">
-        <span class="label">Output</span>
-        <span class="val">{fmt(outputAmt)}</span>
-        <span class="rate">+{fmt(outputPerSec($game))}/s</span>
-      </div>
-    {/if}
-  </section>
+  <main class="grid">
+    <section class="pane left">
+      <h2>Action</h2>
+      <button class="big" on:click={gather}>Gather grain</button>
+      <div class="hint">Click to manually gather. Plows and population auto-produce.</div>
+    </section>
 
-  <section class="action">
-    <button class="big" on:click={gather}>Gather grain</button>
-  </section>
-
-  <section class="upgrades">
-    <h2>Upgrades</h2>
-    {#each agrarianUpgrades as u}
-      {@const lvl = $game.upgrades[u.id] ?? 0}
-      {@const cost = u.cost(lvl).grain}
-      {@const maxed = u.max !== undefined && lvl >= u.max}
-      <button
-        class="upgrade"
-        disabled={maxed || grainAmt < cost}
-        on:click={() => buyUpgrade(u.id)}
-      >
-        <div class="row">
-          <strong>{u.name}</strong>
-          <span class="lvl">Lv {lvl}{u.max ? `/${u.max}` : ''}</span>
-        </div>
-        <div class="desc">{u.desc}</div>
-        <div class="cost">{maxed ? 'maxed' : `${fmt(cost)} grain`}</div>
-      </button>
-    {/each}
-  </section>
-
-  {#if $game.era === 'industrial'}
-    <section class="upgrades">
-      <h2>Industry</h2>
-      {#each industrialUpgrades as u}
+    <section class="pane mid">
+      <h2>Upgrades</h2>
+      {#each agrarianUpgrades as u}
         {@const lvl = $game.upgrades[u.id] ?? 0}
-        {@const c = u.cost(lvl)}
-        {@const grainCostOk = c.grain === undefined || grainAmt >= c.grain}
-        {@const outputCostOk = c.output === undefined || outputAmt >= c.output}
+        {@const cost = u.cost(lvl).grain}
+        {@const maxed = u.max !== undefined && lvl >= u.max}
         <button
           class="upgrade"
-          disabled={!grainCostOk || !outputCostOk}
-          on:click={() => buyIndustrialUpgrade(u.id)}
+          disabled={maxed || grainAmt < cost}
+          on:click={() => buyUpgrade(u.id)}
         >
           <div class="row">
             <strong>{u.name}</strong>
-            <span class="lvl">Lv {lvl}</span>
+            <span class="lvl">Lv {lvl}{u.max ? `/${u.max}` : ''}</span>
           </div>
           <div class="desc">{u.desc}</div>
-          <div class="cost">
-            {c.grain !== undefined ? `${fmt(c.grain)} grain` : ''}
-            {c.output !== undefined ? ` ${fmt(c.output)} output` : ''}
-          </div>
+          <div class="cost">{maxed ? 'maxed' : `${fmt(cost)} grain`}</div>
         </button>
       {/each}
-    </section>
-  {/if}
 
-  {#if visibleProjects.length > 0 || completedCount > 0}
-    <section class="projects">
+      {#if $game.era === 'industrial'}
+        <h2 class="sub">Industry</h2>
+        {#each industrialUpgrades as u}
+          {@const lvl = $game.upgrades[u.id] ?? 0}
+          {@const c = u.cost(lvl)}
+          {@const grainCostOk = c.grain === undefined || grainAmt >= c.grain}
+          {@const outputCostOk = c.output === undefined || outputAmt >= c.output}
+          <button
+            class="upgrade"
+            disabled={!grainCostOk || !outputCostOk}
+            on:click={() => buyIndustrialUpgrade(u.id)}
+          >
+            <div class="row">
+              <strong>{u.name}</strong>
+              <span class="lvl">Lv {lvl}</span>
+            </div>
+            <div class="desc">{u.desc}</div>
+            <div class="cost">
+              {c.grain !== undefined ? `${fmt(c.grain)} grain` : ''}
+              {c.output !== undefined ? ` ${fmt(c.output)} output` : ''}
+            </div>
+          </button>
+        {/each}
+      {/if}
+    </section>
+
+    <section class="pane right">
       <h2>Projects {completedCount > 0 ? `(${completedCount} complete)` : ''}</h2>
+      {#if visibleProjects.length === 0}
+        <p class="empty">All projects complete. The world holds its breath.</p>
+      {/if}
       {#each visibleProjects as p (p.id)}
         {@const unlocked = projectAvailable(p, $game)}
         {@const grainOk = p.cost.grain === undefined || grainAmt >= p.cost.grain}
@@ -158,17 +157,17 @@
         </button>
       {/each}
     </section>
-  {/if}
+  </main>
 
-  <section class="log">
+  <footer class="logbar">
     <h2>Log</h2>
     <ul>
       {#each $game.log as line}
         <li>{line}</li>
       {/each}
     </ul>
-  </section>
-</main>
+  </footer>
+</div>
 
 <style>
   :global(body) {
@@ -177,62 +176,125 @@
     color: #e8dfc8;
     font-family: ui-monospace, 'SF Mono', Menlo, monospace;
   }
-  main {
-    max-width: 720px;
-    margin: 0 auto;
-    padding: 2rem 1.5rem;
+  :global(html, body) { height: 100%; }
+  .app {
+    height: 100vh;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    grid-template-areas:
+      "topbar"
+      "grid"
+      "logbar";
   }
-  header {
+
+  /* Top bar — era, resources, reset */
+  .topbar {
+    grid-area: topbar;
     display: flex;
-    align-items: baseline;
-    gap: 0.75rem;
-    margin-bottom: 1.5rem;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 1.25rem;
+    background: #221c16;
+    border-bottom: 1px solid #3a2f24;
+    flex-wrap: wrap;
   }
-  h1 { margin: 0; font-size: 1.75rem; letter-spacing: 0.05em; }
-  .era { opacity: 0.5; font-size: 0.9rem; }
+  h1 { margin: 0; font-size: 1.5rem; letter-spacing: 0.05em; }
+  .era { opacity: 0.5; font-size: 0.85rem; }
+  .resource-strip { display: flex; gap: 2rem; margin-left: 1rem; flex-wrap: wrap; }
+  .res { display: flex; flex-direction: column; min-width: 140px; }
+  .label { font-size: 0.7rem; opacity: 0.6; text-transform: uppercase; letter-spacing: 0.08em; }
+  .val { font-size: 1.15rem; font-weight: bold; }
+  .val.full { color: #d88a6a; }
+  .rate { font-size: 0.75rem; opacity: 0.7; color: #a8d8a8; }
   .reset {
     margin-left: auto;
     background: none;
     border: 1px solid #444;
     color: #888;
-    padding: 0.25rem 0.5rem;
+    padding: 0.25rem 0.6rem;
     cursor: pointer;
     font: inherit;
     font-size: 0.75rem;
   }
-  .resources {
-    display: flex;
-    gap: 2rem;
-    padding: 1rem;
-    background: #221c16;
-    border: 1px solid #3a2f24;
-    margin-bottom: 1rem;
+  .reset:hover { color: #ccc; border-color: #666; }
+
+  /* Three-column grid body */
+  .grid {
+    grid-area: grid;
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) minmax(280px, 2fr) minmax(280px, 2fr);
+    gap: 1px;
+    background: #0a0805;
+    overflow: hidden;
+    min-height: 0;
   }
-  .res { display: flex; flex-direction: column; }
-  .label { font-size: 0.75rem; opacity: 0.6; text-transform: uppercase; }
-  .val { font-size: 1.5rem; font-weight: bold; }
-  .val.full { color: #d88a6a; }
-  .rate { font-size: 0.8rem; opacity: 0.7; color: #a8d8a8; }
-  .action { margin-bottom: 1.5rem; }
+  .pane {
+    background: #1a1612;
+    padding: 1rem 1.25rem;
+    overflow-y: auto;
+    min-height: 0;
+  }
+  .pane h2 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    opacity: 0.55;
+    letter-spacing: 0.1em;
+    margin: 0 0 0.75rem;
+    position: sticky;
+    top: 0;
+    background: #1a1612;
+    padding-bottom: 0.25rem;
+    border-bottom: 1px solid #2a241c;
+    z-index: 1;
+  }
+  .pane h2.sub {
+    margin-top: 1.5rem;
+    border-top: 1px solid #2a241c;
+    padding-top: 0.75rem;
+    position: static;
+  }
+  .hint {
+    margin-top: 0.75rem;
+    font-size: 0.8rem;
+    opacity: 0.55;
+    line-height: 1.4;
+  }
+
+  /* Bottom log */
+  .logbar {
+    grid-area: logbar;
+    background: #15110d;
+    border-top: 1px solid #2a241c;
+    padding: 0.5rem 1.25rem;
+    max-height: 160px;
+    overflow-y: auto;
+  }
+  .logbar h2 {
+    margin: 0 0 0.25rem;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    opacity: 0.5;
+    letter-spacing: 0.1em;
+  }
+  .logbar ul { list-style: none; padding: 0; margin: 0; font-size: 0.8rem; }
+  .logbar li { padding: 0.15rem 0; opacity: 0.85; }
+
+  /* Action button */
   .big {
     width: 100%;
-    padding: 1rem;
+    padding: 1.5rem 1rem;
     background: #3a5a3a;
     color: #fff;
     border: none;
     font: inherit;
     font-size: 1.1rem;
     cursor: pointer;
+    border-radius: 4px;
   }
+  .big:hover { background: #4a6a4a; }
   .big:active { background: #2a4a2a; }
-  .projects h2,
-  .upgrades h2, .log h2 {
-    font-size: 0.85rem;
-    text-transform: uppercase;
-    opacity: 0.6;
-    letter-spacing: 0.1em;
-    margin: 1rem 0 0.5rem;
-  }
+
+  /* Upgrades */
   .upgrade {
     display: block;
     width: 100%;
@@ -244,13 +306,16 @@
     padding: 0.75rem;
     margin-bottom: 0.5rem;
     cursor: pointer;
+    border-radius: 3px;
   }
-  .upgrade:hover:not(:disabled) { border-color: #6a5a3a; }
+  .upgrade:hover:not(:disabled) { border-color: #6a5a3a; background: #2a221a; }
   .upgrade:disabled { opacity: 0.4; cursor: not-allowed; }
-  .row { display: flex; justify-content: space-between; }
+  .row { display: flex; justify-content: space-between; align-items: center; }
   .lvl { opacity: 0.6; font-size: 0.85rem; }
-  .desc { font-size: 0.85rem; opacity: 0.75; margin: 0.25rem 0; }
+  .desc { font-size: 0.85rem; opacity: 0.75; margin: 0.25rem 0; line-height: 1.35; }
   .cost { font-size: 0.85rem; color: #d4b87a; }
+
+  /* Projects */
   .project {
     display: block;
     width: 100%;
@@ -262,6 +327,7 @@
     padding: 0.75rem;
     margin-bottom: 0.5rem;
     cursor: pointer;
+    border-radius: 3px;
   }
   .project:hover:not(:disabled) { border-color: #5a7a9a; background: #232a30; }
   .project:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -269,17 +335,15 @@
   .project.locked .desc { font-style: italic; opacity: 0.7; }
   .locked-tag { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.6; }
   .empty { opacity: 0.5; font-size: 0.85rem; font-style: italic; }
-  .log ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    font-size: 0.85rem;
-    max-height: 200px;
-    overflow-y: auto;
-  }
-  .log li {
-    padding: 0.25rem 0;
-    border-bottom: 1px solid #2a241c;
-    opacity: 0.85;
+
+  /* Narrow screen: stack panes */
+  @media (max-width: 900px) {
+    .app { height: auto; min-height: 100vh; }
+    .grid {
+      grid-template-columns: 1fr;
+      gap: 0;
+    }
+    .pane { max-height: none; }
+    .logbar { max-height: 240px; }
   }
 </style>
