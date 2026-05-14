@@ -17,6 +17,7 @@
 
 import { get } from 'svelte/store';
 import { game, spend, logEvent, type GameState } from '../game';
+import { bulkCost, affordableCount } from './agrarian';
 
 const FACTORY_BASE_COST = 500;
 const FACTORY_COST_GROWTH = 1.3;
@@ -104,20 +105,55 @@ export function grainDrainPerSec(s: GameState = get(game)): number {
   return (s.upgrades.factory ?? 0) * FACTORY_GRAIN_DRAIN * factoryGrainMult(s);
 }
 
-export function buyIndustrialUpgrade(id: string) {
+// Mirror of cost curves for bulk-buy lookups. Each industrial upgrade pays
+// in either grain or output — track which.
+const INDUSTRIAL_CURVES: Record<
+  string,
+  { base: number; growth: number; max?: number; payRes: 'grain' | 'output' }
+> = {
+  factory:   { base: FACTORY_BASE_COST,   growth: FACTORY_COST_GROWTH,   payRes: 'grain' },
+  workshop:  { base: WORKSHOP_BASE_COST,  growth: WORKSHOP_COST_GROWTH,  payRes: 'grain' },
+  warehouse: { base: WAREHOUSE_BASE_COST, growth: WAREHOUSE_COST_GROWTH, payRes: 'output' },
+  railroad:  { base: RAILROAD_BASE_COST,  growth: RAILROAD_COST_GROWTH,  payRes: 'output', max: 7 },
+};
+
+export function buyIndustrialUpgrade(id: string, count: number | 'max' = 1) {
   const s = get(game);
   const def = industrialUpgrades.find(u => u.id === id);
-  if (!def) return;
+  const curve = INDUSTRIAL_CURVES[id];
+  if (!def || !curve) return;
   const lvl = s.upgrades[id] ?? 0;
-  if (def.max && lvl >= def.max) return;
-  const cost = def.cost(lvl);
-  if (cost.grain !== undefined && !spend('grain', cost.grain)) return;
-  if (cost.output !== undefined && !spend('output', cost.output)) return;
+  if (def.max !== undefined && lvl >= def.max) return;
+  const remaining = def.max !== undefined ? def.max - lvl : Infinity;
+  const available = s.resources[curve.payRes] ?? 0;
+  let n =
+    count === 'max'
+      ? affordableCount(curve.base, curve.growth, lvl, available, def.max)
+      : Math.min(count, remaining);
+  if (n <= 0) return;
+  while (n > 0 && bulkCost(curve.base, curve.growth, lvl, n) > available) n--;
+  if (n <= 0) return;
+  const total = bulkCost(curve.base, curve.growth, lvl, n);
+  if (!spend(curve.payRes, total)) return;
   game.update(s => ({
     ...s,
-    upgrades: { ...s.upgrades, [id]: lvl + 1 },
+    upgrades: { ...s.upgrades, [id]: lvl + n },
   }));
   if (lvl === 0) logEvent(`First ${def.name.toLowerCase()} built.`);
+}
+
+export function nextBulkCost(id: string, count: number | 'max'): { total: number; n: number; res: 'grain' | 'output' } {
+  const s = get(game);
+  const curve = INDUSTRIAL_CURVES[id];
+  if (!curve) return { total: 0, n: 0, res: 'grain' };
+  const lvl = s.upgrades[id] ?? 0;
+  const def = industrialUpgrades.find(u => u.id === id)!;
+  const available = s.resources[curve.payRes] ?? 0;
+  let n =
+    count === 'max'
+      ? affordableCount(curve.base, curve.growth, lvl, available, def.max)
+      : Math.min(count, def.max !== undefined ? def.max - lvl : Infinity);
+  return { total: bulkCost(curve.base, curve.growth, lvl, n), n, res: curve.payRes };
 }
 
 export function tickIndustrial(dt: number) {

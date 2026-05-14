@@ -26,6 +26,9 @@ export const initialState: GameState = {
 
 export const game = writable<GameState>(initialState);
 
+export type BuyMode = 1 | 10 | 100 | 'max';
+export const buyMode = writable<BuyMode>(1);
+
 export function logEvent(msg: string) {
   game.update(s => ({ ...s, log: [msg, ...s.log].slice(0, 50) }));
 }

@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { game, logEvent } from './game/game';
-  import { agrarianUpgrades, buyUpgrade, grainPerSec, grainConsumedPerSec, consumptionPerPop, grainCap, popCap, gatherGrain } from './game/eras/agrarian';
-  import { industrialUpgrades, buyIndustrialUpgrade, outputPerSec, grainDrainPerSec, outputCap } from './game/eras/industrial';
+  import { game, logEvent, buyMode, type BuyMode } from './game/game';
+  import { agrarianUpgrades, buyUpgrade, nextAgrarianBulkCost, grainPerSec, grainConsumedPerSec, consumptionPerPop, grainCap, popCap, gatherGrain } from './game/eras/agrarian';
+  import { industrialUpgrades, buyIndustrialUpgrade, nextBulkCost, outputPerSec, grainDrainPerSec, outputCap } from './game/eras/industrial';
   import { projects, projectAvailable, projectIncomplete, completeProject } from './game/projects';
   import { startLoop, stopLoop } from './game/tick';
   import { hydrate, resetGame } from './game/save';
@@ -36,6 +36,9 @@
   $: perPop = consumptionPerPop($game);
   $: visibleProjects = projects.filter(p => projectIncomplete(p, $game));
   $: completedCount = Object.keys($game.completedProjects ?? {}).length;
+
+  const buyModes: BuyMode[] = [1, 10, 100, 'max'];
+  function setMode(m: BuyMode) { buyMode.set(m); }
 
   function hardReset() {
     if (confirm('Wipe save and restart?')) {
@@ -77,64 +80,79 @@
         </div>
       {/if}
     </div>
+    <button class="big" on:click={gather}>Gather grain</button>
     <button class="reset" on:click={hardReset}>reset</button>
   </header>
 
   <main class="grid">
-    <section class="pane left">
-      <h2>Action</h2>
-      <button class="big" on:click={gather}>Gather grain</button>
-      <div class="hint">Click to manually gather. Plows and population auto-produce.</div>
-    </section>
+    <section class="pane upgrades-pane">
+      <div class="pane-head">
+        <h2>Upgrades</h2>
+        <div class="mode">
+          {#each buyModes as m}
+            <button class:active={$buyMode === m} on:click={() => setMode(m)}>{m === 'max' ? 'Max' : `×${m}`}</button>
+          {/each}
+        </div>
+      </div>
 
-    <section class="pane mid">
-      <h2>Upgrades</h2>
-      {#each agrarianUpgrades as u}
-        {@const lvl = $game.upgrades[u.id] ?? 0}
-        {@const cost = u.cost(lvl).grain}
-        {@const maxed = u.max !== undefined && lvl >= u.max}
-        <button
-          class="upgrade"
-          disabled={maxed || grainAmt < cost}
-          on:click={() => buyUpgrade(u.id)}
-        >
-          <div class="row">
-            <strong>{u.name}</strong>
-            <span class="lvl">Lv {lvl}{u.max ? `/${u.max}` : ''}</span>
-          </div>
-          <div class="desc">{u.desc}</div>
-          <div class="cost">{maxed ? 'maxed' : `${fmt(cost)} grain`}</div>
-        </button>
-      {/each}
-
-      {#if $game.era === 'industrial'}
-        <h2 class="sub">Industry</h2>
-        {#each industrialUpgrades as u}
+      <div class="card-grid">
+        {#each agrarianUpgrades as u}
           {@const lvl = $game.upgrades[u.id] ?? 0}
-          {@const c = u.cost(lvl)}
-          {@const grainCostOk = c.grain === undefined || grainAmt >= c.grain}
-          {@const outputCostOk = c.output === undefined || outputAmt >= c.output}
-          <button
-            class="upgrade"
-            disabled={!grainCostOk || !outputCostOk}
-            on:click={() => buyIndustrialUpgrade(u.id)}
-          >
+          {@const maxed = u.max !== undefined && lvl >= u.max}
+          {@const bulk = nextAgrarianBulkCost(u.id, $buyMode)}
+          {@const buyable = !maxed && bulk.n > 0 && grainAmt >= bulk.total}
+          <button class="upgrade" disabled={!buyable} on:click={() => buyUpgrade(u.id, $buyMode)}>
             <div class="row">
               <strong>{u.name}</strong>
-              <span class="lvl">Lv {lvl}</span>
+              <span class="lvl">Lv {lvl}{u.max ? `/${u.max}` : ''}</span>
             </div>
             <div class="desc">{u.desc}</div>
             <div class="cost">
-              {c.grain !== undefined ? `${fmt(c.grain)} grain` : ''}
-              {c.output !== undefined ? ` ${fmt(c.output)} output` : ''}
+              {#if maxed}maxed
+              {:else if bulk.n === 0}—
+              {:else}
+                buy {bulk.n} · {fmt(bulk.total)} grain
+              {/if}
             </div>
           </button>
         {/each}
+      </div>
+
+      {#if $game.era === 'industrial' || $game.era === 'information'}
+        <div class="pane-head">
+          <h2 class="sub">Industry</h2>
+        </div>
+        <div class="card-grid">
+          {#each industrialUpgrades as u}
+            {@const lvl = $game.upgrades[u.id] ?? 0}
+            {@const maxed = u.max !== undefined && lvl >= u.max}
+            {@const bulk = nextBulkCost(u.id, $buyMode)}
+            {@const have = bulk.res === 'grain' ? grainAmt : outputAmt}
+            {@const buyable = !maxed && bulk.n > 0 && have >= bulk.total}
+            <button class="upgrade" disabled={!buyable} on:click={() => buyIndustrialUpgrade(u.id, $buyMode)}>
+              <div class="row">
+                <strong>{u.name}</strong>
+                <span class="lvl">Lv {lvl}{u.max ? `/${u.max}` : ''}</span>
+              </div>
+              <div class="desc">{u.desc}</div>
+              <div class="cost">
+                {#if maxed}maxed
+                {:else if bulk.n === 0}—
+                {:else}
+                  buy {bulk.n} · {fmt(bulk.total)} {bulk.res}
+                {/if}
+              </div>
+            </button>
+          {/each}
+        </div>
       {/if}
     </section>
 
-    <section class="pane right">
-      <h2>Projects {completedCount > 0 ? `(${completedCount} complete)` : ''}</h2>
+    <section class="pane projects-pane">
+      <div class="pane-head">
+        <h2>Projects {completedCount > 0 ? `(${completedCount} done)` : ''}</h2>
+      </div>
+      <div class="card-grid">
       {#if visibleProjects.length === 0}
         <p class="empty">All projects complete. The world holds its breath.</p>
       {/if}
@@ -162,6 +180,7 @@
           </div>
         </button>
       {/each}
+      </div>
     </section>
   </main>
 
@@ -229,7 +248,7 @@
   .grid {
     grid-area: grid;
     display: grid;
-    grid-template-columns: minmax(220px, 1fr) minmax(280px, 2fr) minmax(280px, 2fr);
+    grid-template-columns: 3fr 2fr;
     gap: 1px;
     background: #0a0805;
     overflow: hidden;
@@ -246,25 +265,38 @@
     text-transform: uppercase;
     opacity: 0.55;
     letter-spacing: 0.1em;
+    margin: 0;
+  }
+  .pane-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
     margin: 0 0 0.75rem;
-    position: sticky;
-    top: 0;
-    background: #1a1612;
-    padding-bottom: 0.25rem;
+    padding-bottom: 0.4rem;
     border-bottom: 1px solid #2a241c;
-    z-index: 1;
   }
   .pane h2.sub {
-    margin-top: 1.5rem;
-    border-top: 1px solid #2a241c;
-    padding-top: 0.75rem;
-    position: static;
+    margin-top: 1rem;
   }
-  .hint {
-    margin-top: 0.75rem;
-    font-size: 0.8rem;
-    opacity: 0.55;
-    line-height: 1.4;
+  .mode { display: flex; gap: 0.25rem; }
+  .mode button {
+    background: #221c16;
+    border: 1px solid #3a2f24;
+    color: #b8b09a;
+    padding: 0.25rem 0.6rem;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.75rem;
+    border-radius: 3px;
+  }
+  .mode button:hover { border-color: #6a5a3a; }
+  .mode button.active { background: #4a3a24; color: #fff; border-color: #8a6a3a; }
+
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 0.5rem;
   }
 
   /* Bottom log */
@@ -286,17 +318,17 @@
   .logbar ul { list-style: none; padding: 0; margin: 0; font-size: 0.8rem; }
   .logbar li { padding: 0.15rem 0; opacity: 0.85; }
 
-  /* Action button */
+  /* Action button (now in top bar) */
   .big {
-    width: 100%;
-    padding: 1.5rem 1rem;
     background: #3a5a3a;
     color: #fff;
     border: none;
     font: inherit;
-    font-size: 1.1rem;
+    font-size: 0.9rem;
     cursor: pointer;
     border-radius: 4px;
+    padding: 0.5rem 1rem;
+    margin-left: 0.5rem;
   }
   .big:hover { background: #4a6a4a; }
   .big:active { background: #2a4a2a; }

@@ -132,17 +132,93 @@ export function grainPerSec(s: GameState = get(game)): number {
   return plowOutput + popOutput;
 }
 
-export function buyUpgrade(id: string) {
+/**
+ * Total cost to buy `count` levels of an upgrade starting at currentLvl,
+ * given a geometric cost function. Uses closed-form sum of a geometric series.
+ */
+export function bulkCost(
+  base: number,
+  growth: number,
+  currentLvl: number,
+  count: number,
+): number {
+  if (count <= 0) return 0;
+  // sum from k=0..count-1 of base * growth^(currentLvl+k)
+  //   = base * growth^currentLvl * (growth^count - 1) / (growth - 1)
+  if (growth === 1) return base * count;
+  const sum = base * Math.pow(growth, currentLvl) * (Math.pow(growth, count) - 1) / (growth - 1);
+  return Math.ceil(sum);
+}
+
+/**
+ * How many levels of an upgrade can be bought with `grain` available,
+ * given base/growth cost, starting at currentLvl. Closed-form inverse.
+ */
+export function affordableCount(
+  base: number,
+  growth: number,
+  currentLvl: number,
+  available: number,
+  maxLevel?: number,
+): number {
+  if (available <= 0) return 0;
+  // available >= base * growth^currentLvl * (growth^k - 1) / (growth - 1)
+  // (growth^k - 1) <= available * (growth - 1) / (base * growth^currentLvl)
+  // growth^k <= 1 + available * (growth - 1) / (base * growth^currentLvl)
+  const cap = 1 + (available * (growth - 1)) / (base * Math.pow(growth, currentLvl));
+  if (cap <= 1) return 0;
+  let k = Math.floor(Math.log(cap) / Math.log(growth));
+  // floor may be off by 1 due to float; verify and adjust.
+  while (bulkCost(base, growth, currentLvl, k + 1) <= available) k++;
+  while (k > 0 && bulkCost(base, growth, currentLvl, k) > available) k--;
+  if (maxLevel !== undefined) k = Math.min(k, maxLevel - currentLvl);
+  return Math.max(0, k);
+}
+
+export function nextAgrarianBulkCost(id: string, count: number | 'max'): { total: number; n: number } {
+  const s = get(game);
+  const curve = UPGRADE_CURVES[id];
+  if (!curve) return { total: 0, n: 0 };
+  const lvl = s.upgrades[id] ?? 0;
+  const def = agrarianUpgrades.find(u => u.id === id)!;
+  const grain = s.resources.grain ?? 0;
+  let n =
+    count === 'max'
+      ? affordableCount(curve.base, curve.growth, lvl, grain, def.max)
+      : Math.min(count, def.max !== undefined ? def.max - lvl : Infinity);
+  return { total: bulkCost(curve.base, curve.growth, lvl, n), n };
+}
+
+// Upgrade growth constants for bulk-buy lookups (mirror the table above).
+const UPGRADE_CURVES: Record<string, { base: number; growth: number; max?: number }> = {
+  plow:       { base: PLOW_BASE_COST,       growth: PLOW_COST_GROWTH },
+  irrigation: { base: IRRIGATION_BASE_COST, growth: IRRIGATION_COST_GROWTH, max: IRRIGATION_MAX },
+  granary:    { base: GRANARY_BASE_COST,    growth: GRANARY_COST_GROWTH },
+  dwelling:   { base: DWELLING_BASE_COST,   growth: DWELLING_COST_GROWTH },
+};
+
+export function buyUpgrade(id: string, count: number | 'max' = 1) {
   const s = get(game);
   const def = agrarianUpgrades.find(u => u.id === id);
-  if (!def) return;
+  const curve = UPGRADE_CURVES[id];
+  if (!def || !curve) return;
   const lvl = s.upgrades[id] ?? 0;
-  if (def.max && lvl >= def.max) return;
-  const cost = def.cost(lvl);
-  if (!spend('grain', cost.grain)) return;
+  if (def.max !== undefined && lvl >= def.max) return;
+  const remaining = def.max !== undefined ? def.max - lvl : Infinity;
+  const grain = s.resources.grain ?? 0;
+  let n =
+    count === 'max'
+      ? affordableCount(curve.base, curve.growth, lvl, grain, def.max)
+      : Math.min(count, remaining);
+  if (n <= 0) return;
+  // Clamp to what's actually affordable.
+  while (n > 0 && bulkCost(curve.base, curve.growth, lvl, n) > grain) n--;
+  if (n <= 0) return;
+  const total = bulkCost(curve.base, curve.growth, lvl, n);
+  if (!spend('grain', total)) return;
   game.update(s => ({
     ...s,
-    upgrades: { ...s.upgrades, [id]: lvl + 1 },
+    upgrades: { ...s.upgrades, [id]: lvl + n },
   }));
   if (lvl === 0) logEvent(`First ${def.name.toLowerCase()} built.`);
 }
