@@ -329,7 +329,9 @@ function adjustGrain(delta: number) {
 }
 
 export function gatherGrain() {
-  adjustGrain(1);
+  const rate = grainPerSec(get(game));
+  const reward = Math.max(1, Math.floor(Math.sqrt(rate)));
+  adjustGrain(reward);
 }
 
 export function tickAgrarian(dt: number) {

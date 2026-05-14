@@ -252,7 +252,10 @@
 
   <main class="grid">
     <section class="pane upgrades-pane">
-      <button class="big" on:click={gather}>Gather grain</button>
+      <button class="big" on:click={gather}>
+        Gather grain
+        <span class="big-sub">+{fmt(Math.max(1, Math.floor(Math.sqrt(grainProduction))))} per click</span>
+      </button>
 
       {#if upgradesHorizon}
         {@const horCost = upgradesHorizon.cost.grain ?? upgradesHorizon.cost.output ?? 0}
@@ -788,6 +791,12 @@
     .resource-strip { gap: 1.5rem; }
     .res { min-width: 100px; padding-left: 0.6rem; }
     .big { margin-left: 0; }
+  }
+
+  .big-sub {
+    display: block; font-size: 0.7rem; letter-spacing: 0.1em;
+    text-transform: uppercase; opacity: 0.65; margin-top: 0.25rem;
+    font-family: var(--font-mono, monospace);
   }
 
   .legacy-chip {
