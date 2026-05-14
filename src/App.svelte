@@ -62,6 +62,34 @@
   const buyModes: BuyMode[] = [1, 10, 100, 'max'];
   function setMode(m: BuyMode) { buyMode.set(m); }
 
+  /** Affordability ratio (0..1) for an upgrade card. */
+  function fillRatio(cost: number, res: 'grain' | 'output'): number {
+    if (!cost || cost <= 0) return 0;
+    const have = res === 'grain' ? grainAmt : outputAmt;
+    return Math.max(0, Math.min(1, have / cost));
+  }
+
+  /** Find the nearest locked project for a given era — the "horizon". */
+  function nextHorizon(era: 'agrarian' | 'industrial' | 'information') {
+    const locked = projects.filter(p =>
+      projectIncomplete(p, $game) &&
+      !projectAvailable(p, $game) &&
+      (p.era === era || (p.era === 'agrarian' && era === 'agrarian'))
+    );
+    // If no locked projects, look at unlocked-but-unaffordable as next horizon.
+    if (locked.length === 0) {
+      const unaffordable = projects.filter(p =>
+        projectIncomplete(p, $game) &&
+        projectAvailable(p, $game) &&
+        p.era === era
+      ).sort((a, b) => (a.cost.grain ?? a.cost.output ?? 0) - (b.cost.grain ?? b.cost.output ?? 0));
+      return unaffordable[0] ?? null;
+    }
+    return locked.sort((a, b) => (a.cost.grain ?? a.cost.output ?? 0) - (b.cost.grain ?? b.cost.output ?? 0))[0];
+  }
+
+  $: upgradesHorizon = nextHorizon($game.era === 'industrial' || $game.era === 'information' ? 'industrial' : 'agrarian');
+
   function hardReset() {
     if (confirm('Wipe save and restart?')) {
       resetGame();
@@ -113,6 +141,20 @@
 
   <main class="grid">
     <section class="pane upgrades-pane">
+      {#if upgradesHorizon}
+        {@const horCost = upgradesHorizon.cost.grain ?? upgradesHorizon.cost.output ?? 0}
+        {@const horRes = upgradesHorizon.cost.grain !== undefined ? 'grain' : 'output'}
+        {@const horHave = horRes === 'grain' ? grainAmt : outputAmt}
+        {@const horPct = Math.max(0, Math.min(1, horHave / horCost))}
+        <div class="horizon">
+          <div class="horizon-fill" style="width: {horPct * 100}%"></div>
+          <div class="horizon-text">
+            <span class="horizon-kicker">Next</span>
+            <span class="horizon-name">{projectAvailable(upgradesHorizon, $game) ? upgradesHorizon.name : '— locked —'}</span>
+            <span class="horizon-cost">{fmt(horHave)} / {fmt(horCost)} {horRes}</span>
+          </div>
+        </div>
+      {/if}
       <div class="pane-head">
         <h2>Upgrades</h2>
         <div class="mode">
@@ -131,7 +173,12 @@
           {@const maxed = max !== undefined && lvl >= max}
           {@const bulk = nextAgrarianBulkCost(u.id, $buyMode, $game)}
           {@const buyable = !maxed && bulk.n > 0 && grainAmt >= bulk.total}
-          <button class="upgrade" disabled={!buyable} on:click={() => buyUpgrade(u.id, $buyMode)}>
+          <button
+            class="upgrade"
+            disabled={!buyable}
+            style="--fill: {fillRatio(bulk.total, 'grain') * 100}%"
+            on:click={() => buyUpgrade(u.id, $buyMode)}
+          >
             <div class="row">
               <strong>{displayName}</strong>
               <span class="lvl">Lv {lvl}{max !== undefined ? `/${max}` : ''}</span>
@@ -163,7 +210,12 @@
             {@const bulk = nextBulkCost(u.id, $buyMode, $game)}
             {@const have = bulk.res === 'grain' ? grainAmt : outputAmt}
             {@const buyable = !maxed && bulk.n > 0 && have >= bulk.total}
-            <button class="upgrade" disabled={!buyable} on:click={() => buyIndustrialUpgrade(u.id, $buyMode)}>
+            <button
+              class="upgrade"
+              disabled={!buyable}
+              style="--fill: {fillRatio(bulk.total, bulk.res) * 100}%"
+              on:click={() => buyIndustrialUpgrade(u.id, $buyMode)}
+            >
               <div class="row">
                 <strong>{u.name}</strong>
                 <span class="lvl">Lv {lvl}{u.max ? `/${u.max}` : ''}</span>
@@ -372,6 +424,52 @@
   }
   .upgrades-pane { border-right: 1px solid var(--rule); }
 
+  /* ============================== Horizon strap =========================== */
+  .horizon {
+    position: relative;
+    background: var(--parchment-3);
+    border: 1px solid var(--rule);
+    margin-bottom: 1.25rem;
+    padding: 0.55rem 0.9rem 0.6rem;
+    overflow: hidden;
+  }
+  .horizon-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: linear-gradient(90deg, var(--gilt) 0%, rgba(184, 134, 44, 0.35) 100%);
+    opacity: 0.5;
+    transition: width 300ms ease;
+    z-index: 0;
+  }
+  .horizon-text {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+  .horizon-kicker {
+    font-family: var(--font-body);
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: var(--ink-dim);
+  }
+  .horizon-name {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-variation-settings: var(--display-italic-settings);
+    font-size: 1.05rem;
+    color: var(--ink);
+    flex: 1;
+  }
+  .horizon-cost {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--ink);
+  }
+
   .pane-head {
     display: flex;
     align-items: baseline;
@@ -433,8 +531,20 @@
     padding: 0.85rem 1rem 0.9rem;
     cursor: pointer;
     position: relative;
+    overflow: hidden;
     transition: transform 120ms ease, background 200ms ease, box-shadow 200ms ease;
   }
+  .upgrade::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: var(--fill, 0%);
+    background: linear-gradient(90deg, rgba(184, 134, 44, 0.22) 0%, rgba(184, 134, 44, 0.06) 100%);
+    pointer-events: none;
+    transition: width 250ms ease;
+    z-index: 0;
+  }
+  .upgrade > * { position: relative; z-index: 1; }
   .upgrade:hover:not(:disabled),
   .project:hover:not(:disabled):not(.locked) {
     background: var(--parchment-3);

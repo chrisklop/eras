@@ -27,11 +27,13 @@ const FACTORY_OUTPUT_BASE = 1;          // output/sec/factory
 const WORKSHOP_BASE_COST = 2000;
 const WORKSHOP_COST_GROWTH = 1.25;      // each lvl: +20% factory output
 
-// Output-paid buildings: base must be affordable from BASE_OUTPUT_CAP so the
-// player isn't stuck the moment Industrial begins.
-const WAREHOUSE_BASE_COST = 50;         // in output
+// Warehouses are physical infrastructure — paid in grain like other buildings.
+// (Paying output to store output is narratively odd; player enters Industrial
+// with plenty of grain anyway.)
+const WAREHOUSE_BASE_COST = 1000;       // in grain
 const WAREHOUSE_COST_GROWTH = 1.35;
 
+// Railroads ARE output (manufactured iron rails) — pay in output.
 const RAILROAD_BASE_COST = 500;
 const RAILROAD_COST_GROWTH = 1.4;       // each lvl: -10% factory grain drain
 
@@ -67,7 +69,7 @@ export const industrialUpgrades: IndustrialUpgrade[] = [
     id: 'warehouse',
     name: 'Warehouse',
     desc: 'Stores output. Pre-Logistics: +200 cap. Post-Logistics: ×1.5 cap each.',
-    cost: (lvl) => ({ output: Math.ceil(WAREHOUSE_BASE_COST * Math.pow(WAREHOUSE_COST_GROWTH, lvl)) }),
+    cost: (lvl) => ({ grain: Math.ceil(WAREHOUSE_BASE_COST * Math.pow(WAREHOUSE_COST_GROWTH, lvl)) }),
     effect: '+output storage',
   },
   {
@@ -116,7 +118,7 @@ const INDUSTRIAL_CURVES: Record<
 > = {
   factory:   { base: FACTORY_BASE_COST,   growth: FACTORY_COST_GROWTH,   payRes: 'grain' },
   workshop:  { base: WORKSHOP_BASE_COST,  growth: WORKSHOP_COST_GROWTH,  payRes: 'grain' },
-  warehouse: { base: WAREHOUSE_BASE_COST, growth: WAREHOUSE_COST_GROWTH, payRes: 'output' },
+  warehouse: { base: WAREHOUSE_BASE_COST, growth: WAREHOUSE_COST_GROWTH, payRes: 'grain' },
   railroad:  { base: RAILROAD_BASE_COST,  growth: RAILROAD_COST_GROWTH,  payRes: 'output', max: 7 },
 };
 
