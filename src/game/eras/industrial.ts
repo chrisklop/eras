@@ -20,7 +20,7 @@ import { game, spend, logEvent, type GameState } from '../game';
 import { bulkCost, affordableCount, popFactoryMultiplier, laborFraction } from './agrarian';
 
 const FACTORY_BASE_COST = 1500;
-const FACTORY_COST_GROWTH = 1.4;
+const FACTORY_COST_GROWTH = 1.25;
 const FACTORY_GRAIN_DRAIN = 2;
 const FACTORY_COAL_DRAIN = 1;
 const FACTORY_OUTPUT_BASE = 0.5;
@@ -29,22 +29,22 @@ const MASS_PRODUCTION_MULT = 1.5;
 const ELECTRICITY_MULT = 1.5;
 const WORKSHOP_PER_LEVEL = 1.15;
 
-const WORKSHOP_BASE_COST = 6000;
-const WORKSHOP_COST_GROWTH = 1.3;
+const WORKSHOP_BASE_COST = 4000;
+const WORKSHOP_COST_GROWTH = 1.18;
 
-const WAREHOUSE_BASE_COST = 2500;
-const WAREHOUSE_COST_GROWTH = 1.25;
+const WAREHOUSE_BASE_COST = 2000;
+const WAREHOUSE_COST_GROWTH = 1.15;
 
-const RAILROAD_BASE_COST = 1500;
-const RAILROAD_COST_GROWTH = 1.4;
+const RAILROAD_BASE_COST = 1000;
+const RAILROAD_COST_GROWTH = 1.2;
 
-const MINE_BASE_COST = 2000;
-const MINE_COST_GROWTH = 1.32;
+const MINE_BASE_COST = 1500;
+const MINE_COST_GROWTH = 1.2;
 const COAL_PER_MINE = 1;
 const STEEL_MILLS_MULT = 1.8;
 
-const COAL_YARD_BASE_COST = 1500;
-const COAL_YARD_COST_GROWTH = 1.25;
+const COAL_YARD_BASE_COST = 1000;
+const COAL_YARD_COST_GROWTH = 1.15;
 const BASE_COAL_CAP = 200;
 const COAL_PER_YARD_PRE = 300;          // linear pre-Refining
 const COAL_YARD_CAP_MULT = 1.5;         // post-Refining paradigm shift

@@ -9,19 +9,19 @@ import { game, spend, logEvent, type GameState } from '../game';
 // =============================================================================
 
 const PLOW_BASE_COST = 10;
-const PLOW_COST_GROWTH = 1.18;
+const PLOW_COST_GROWTH = 1.13;
 const PLOW_BASE_OUTPUT = 0.5;
 
-const IRRIGATION_BASE_COST = 100;
-const IRRIGATION_COST_GROWTH = 2.2;
+const IRRIGATION_BASE_COST = 80;
+const IRRIGATION_COST_GROWTH = 2.0;
 const IRRIGATION_MAX = 5;
 const IRRIGATION_PER_LEVEL = 1.3;
 
-const GRANARY_BASE_COST = 30;
-const GRANARY_COST_GROWTH = 1.4;
+const GRANARY_BASE_COST = 25;
+const GRANARY_COST_GROWTH = 1.25;
 
-const DWELLING_BASE_COST = 20;
-const DWELLING_COST_GROWTH = 1.3;
+const DWELLING_BASE_COST = 15;
+const DWELLING_COST_GROWTH = 1.15;
 
 // Multiplier magnitudes — kept small to avoid pacing collapse.
 const CROP_ROTATION_MULT = 1.5;
