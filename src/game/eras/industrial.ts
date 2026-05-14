@@ -17,7 +17,7 @@
 
 import { get } from 'svelte/store';
 import { game, spend, logEvent, type GameState } from '../game';
-import { bulkCost, affordableCount } from './agrarian';
+import { bulkCost, affordableCount, popFactoryMultiplier } from './agrarian';
 
 const FACTORY_BASE_COST = 500;
 const FACTORY_COST_GROWTH = 1.3;
@@ -89,7 +89,8 @@ export function outputCap(s: GameState = get(game)): number {
 export function factoryOutputMult(s: GameState = get(game)): number {
   const workshops = s.upgrades.workshop ?? 0;
   const electricMult = s.flags.electricity ? 2 : 1;
-  return (1 + 0.2 * workshops) * electricMult;
+  const massProdMult = s.flags.massProduction ? 2 : 1;
+  return (1 + 0.2 * workshops) * electricMult * massProdMult * popFactoryMultiplier(s);
 }
 
 export function factoryGrainMult(s: GameState = get(game)): number {

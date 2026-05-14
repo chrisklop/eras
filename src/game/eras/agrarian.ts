@@ -27,8 +27,23 @@ const PRE_POTTERY_CAP_PER_GRANARY = 50;
 const POTTERY_CAP_MULT = 1.5;
 
 const BASE_POP_CAP = 5;
-const POP_PER_DWELLING = 5;
 const BASE_POP_GROWTH = 0.3;
+
+// Housing tiers — each project flag overrides the lower tier.
+export const HOUSING_TIERS = [
+  { flag: 'apartmentBlocks', name: 'Apartment Block', popPer: 150, maxDwellings: 120 },
+  { flag: 'tenements',       name: 'Tenement',         popPer: 60,  maxDwellings: 80 },
+  { flag: 'cityPlanning',    name: 'Insula',           popPer: 25,  maxDwellings: 50 },
+  { flag: 'masonry',         name: 'Brick House',      popPer: 12,  maxDwellings: 30 },
+  { flag: null,              name: 'Hut',              popPer: 5,   maxDwellings: 15 },
+] as const;
+
+export function currentHousingTier(s: GameState = get(game)) {
+  for (const t of HOUSING_TIERS) {
+    if (t.flag === null || s.flags[t.flag]) return t;
+  }
+  return HOUSING_TIERS[HOUSING_TIERS.length - 1];
+}
 const POP_GROWTH_PER_DWELLING = 0.1;
 const MAX_POP_GROWTH = 3;
 
@@ -92,13 +107,28 @@ export function grainCap(s: GameState = get(game)): number {
 }
 
 export function popCap(s: GameState = get(game)): number {
-  return BASE_POP_CAP + POP_PER_DWELLING * (s.upgrades.dwelling ?? 0);
+  const tier = currentHousingTier(s);
+  return BASE_POP_CAP + tier.popPer * (s.upgrades.dwelling ?? 0);
+}
+
+export function dwellingMaxLevel(s: GameState = get(game)): number {
+  return currentHousingTier(s).maxDwellings;
 }
 
 export function popGrowthPerSec(s: GameState = get(game)): number {
   const dwellings = s.upgrades.dwelling ?? 0;
   const compassBoost = s.flags.compass ? 0.5 : 0;
   return Math.min(MAX_POP_GROWTH, BASE_POP_GROWTH + POP_GROWTH_PER_DWELLING * dwellings + compassBoost);
+}
+
+/**
+ * Population scales factory output: above 100 pop, each extra pop = +1% factory
+ * output, capped at +200% (so 300 pop = 3×). Industrial-era reward for housing.
+ */
+export function popFactoryMultiplier(s: GameState = get(game)): number {
+  const pop = s.resources.pop ?? 0;
+  const bonus = Math.max(0, Math.min(2, (pop - 100) * 0.01));
+  return 1 + bonus;
 }
 
 /** Per-pop grain consumption per second, after all tech reductions. */
@@ -175,17 +205,24 @@ export function affordableCount(
   return Math.max(0, k);
 }
 
+function effectiveMax(id: string, def: Upgrade, s: GameState): number | undefined {
+  if (id === 'dwelling') return dwellingMaxLevel(s);
+  return def.max;
+}
+
 export function nextAgrarianBulkCost(id: string, count: number | 'max'): { total: number; n: number } {
   const s = get(game);
   const curve = UPGRADE_CURVES[id];
   if (!curve) return { total: 0, n: 0 };
   const lvl = s.upgrades[id] ?? 0;
   const def = agrarianUpgrades.find(u => u.id === id)!;
+  const max = effectiveMax(id, def, s);
   const grain = s.resources.grain ?? 0;
+  const remaining = max !== undefined ? Math.max(0, max - lvl) : Infinity;
   let n =
     count === 'max'
-      ? affordableCount(curve.base, curve.growth, lvl, grain, def.max)
-      : Math.min(count, def.max !== undefined ? def.max - lvl : Infinity);
+      ? affordableCount(curve.base, curve.growth, lvl, grain, max)
+      : Math.min(count, remaining);
   return { total: bulkCost(curve.base, curve.growth, lvl, n), n };
 }
 
@@ -203,12 +240,13 @@ export function buyUpgrade(id: string, count: number | 'max' = 1) {
   const curve = UPGRADE_CURVES[id];
   if (!def || !curve) return;
   const lvl = s.upgrades[id] ?? 0;
-  if (def.max !== undefined && lvl >= def.max) return;
-  const remaining = def.max !== undefined ? def.max - lvl : Infinity;
+  const max = effectiveMax(id, def, s);
+  if (max !== undefined && lvl >= max) return;
+  const remaining = max !== undefined ? max - lvl : Infinity;
   const grain = s.resources.grain ?? 0;
   let n =
     count === 'max'
-      ? affordableCount(curve.base, curve.growth, lvl, grain, def.max)
+      ? affordableCount(curve.base, curve.growth, lvl, grain, max)
       : Math.min(count, remaining);
   if (n <= 0) return;
   // Clamp to what's actually affordable.

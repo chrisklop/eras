@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { game, logEvent, buyMode, type BuyMode } from './game/game';
-  import { agrarianUpgrades, buyUpgrade, nextAgrarianBulkCost, grainPerSec, grainConsumedPerSec, consumptionPerPop, grainCap, popCap, gatherGrain } from './game/eras/agrarian';
+  import { agrarianUpgrades, buyUpgrade, nextAgrarianBulkCost, grainPerSec, grainConsumedPerSec, consumptionPerPop, grainCap, popCap, gatherGrain, currentHousingTier, dwellingMaxLevel } from './game/eras/agrarian';
   import { industrialUpgrades, buyIndustrialUpgrade, nextBulkCost, outputPerSec, grainDrainPerSec, outputCap } from './game/eras/industrial';
   import { projects, projectAvailable, projectIncomplete, completeProject } from './game/projects';
   import { startLoop, stopLoop } from './game/tick';
@@ -98,17 +98,24 @@
       <div class="card-grid">
         {#each agrarianUpgrades as u}
           {@const lvl = $game.upgrades[u.id] ?? 0}
-          {@const maxed = u.max !== undefined && lvl >= u.max}
+          {@const isDwelling = u.id === 'dwelling'}
+          {@const displayName = isDwelling ? currentHousingTier($game).name : u.name}
+          {@const max = isDwelling ? dwellingMaxLevel($game) : u.max}
+          {@const maxed = max !== undefined && lvl >= max}
           {@const bulk = nextAgrarianBulkCost(u.id, $buyMode)}
           {@const buyable = !maxed && bulk.n > 0 && grainAmt >= bulk.total}
           <button class="upgrade" disabled={!buyable} on:click={() => buyUpgrade(u.id, $buyMode)}>
             <div class="row">
-              <strong>{u.name}</strong>
-              <span class="lvl">Lv {lvl}{u.max ? `/${u.max}` : ''}</span>
+              <strong>{displayName}</strong>
+              <span class="lvl">Lv {lvl}{max !== undefined ? `/${max}` : ''}</span>
             </div>
-            <div class="desc">{u.desc}</div>
+            <div class="desc">
+              {#if isDwelling}
+                Each holds {currentHousingTier($game).popPer}. Research next tier for more density.
+              {:else}{u.desc}{/if}
+            </div>
             <div class="cost">
-              {#if maxed}maxed
+              {#if maxed}maxed — research next tier
               {:else if bulk.n === 0}—
               {:else}
                 buy {bulk.n} · {fmt(bulk.total)} grain
