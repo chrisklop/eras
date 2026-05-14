@@ -22,12 +22,6 @@
     return n.toExponential(2);
   }
 
-  function canAfford(id: string): boolean {
-    const lvl = $game.upgrades[id] ?? 0;
-    const def = agrarianUpgrades.find(u => u.id === id)!;
-    return ($game.resources.grain ?? 0) >= def.cost(lvl).grain;
-  }
-
   $: grainAmt = $game.resources.grain ?? 0;
   $: cap = grainCap($game);
   $: grainFull = grainAmt >= cap - 0.01;
@@ -71,7 +65,7 @@
       {@const maxed = u.max !== undefined && lvl >= u.max}
       <button
         class="upgrade"
-        disabled={maxed || !canAfford(u.id)}
+        disabled={maxed || grainAmt < cost}
         on:click={() => buyUpgrade(u.id)}
       >
         <div class="row">
