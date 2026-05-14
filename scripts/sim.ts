@@ -8,7 +8,7 @@
 // Run: npx tsx scripts/sim.ts
 
 import { agrarianUpgrades, grainCap, popCap, popGrowthPerSec, grainPerSec, grainConsumedPerSec } from '../src/game/eras/agrarian';
-import { industrialUpgrades, outputCap, outputPerSec, grainDrainPerSec } from '../src/game/eras/industrial';
+import { industrialUpgrades, outputCap, outputPerSec, grainDrainPerSec, coalCap, coalPerSec, coalDrainPerSec } from '../src/game/eras/industrial';
 import { projects, projectAvailable, canAffordProject } from '../src/game/projects';
 import { initialState, type GameState } from '../src/game/game';
 
@@ -43,20 +43,25 @@ function tick(s: GameState, dt: number) {
   const grainCons = grainConsumedPerSec(s);
   let grainDelta = (grainProd - grainCons) * dt;
 
-  // Industrial: factories drain grain → produce output
+  // Industrial: mines → coal; factories drain grain (+ coal) → produce output
   if (s.era === 'industrial' || s.era === 'information') {
+    // Coal production from mines
+    const cCap = coalCap(s);
+    s.resources.coal = Math.min(cCap, (s.resources.coal ?? 0) + coalPerSec(s) * dt);
+
     const factories = s.upgrades.factory ?? 0;
     if (factories > 0) {
-      const drainRate = grainDrainPerSec(s);
-      const outRate = outputPerSec(s);
-      const oCap = outputCap(s);
+      const grainNeeded = grainDrainPerSec(s) * dt;
+      const coalNeeded = coalDrainPerSec(s) * dt;
       const grainAvail = Math.max(0, (s.resources.grain ?? 0) + grainDelta);
-      const grainNeeded = drainRate * dt;
-      const grainUsed = Math.min(grainNeeded, grainAvail);
-      const fraction = grainNeeded > 0 ? grainUsed / grainNeeded : 1;
-      const outputGained = outRate * dt * fraction;
-      grainDelta -= grainUsed;
-      s.resources.output = Math.min(oCap, (s.resources.output ?? 0) + outputGained);
+      const coalAvail = s.resources.coal ?? 0;
+      const grainFraction = grainNeeded > 0 ? Math.min(1, grainAvail / grainNeeded) : 1;
+      const coalFraction  = coalNeeded  > 0 ? Math.min(1, coalAvail / coalNeeded)   : 1;
+      const fraction = Math.min(grainFraction, coalFraction);
+      grainDelta -= grainNeeded * fraction;
+      s.resources.coal = Math.max(0, coalAvail - coalNeeded * fraction);
+      const oCap = outputCap(s);
+      s.resources.output = Math.min(oCap, (s.resources.output ?? 0) + outputPerSec(s) * dt * fraction);
     }
   }
   s.resources.grain = Math.max(0, Math.min(cap, (s.resources.grain ?? 0) + grainDelta));

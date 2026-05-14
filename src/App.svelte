@@ -2,7 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { game, logEvent, buyMode, type BuyMode } from './game/game';
   import { agrarianUpgrades, buyUpgrade, nextAgrarianBulkCost, grainPerSec, grainConsumedPerSec, consumptionPerPop, grainCap, popCap, gatherGrain, currentHousingTier, dwellingMaxLevel } from './game/eras/agrarian';
-  import { industrialUpgrades, buyIndustrialUpgrade, nextBulkCost, outputPerSec, grainDrainPerSec, outputCap } from './game/eras/industrial';
+  import { industrialUpgrades, buyIndustrialUpgrade, nextBulkCost, outputPerSec, grainDrainPerSec, outputCap, coalCap, coalPerSec, coalDrainPerSec } from './game/eras/industrial';
   import { projects, projectAvailable, projectIncomplete, completeProject } from './game/projects';
   import { startLoop, stopLoop } from './game/tick';
   import { hydrate, resetGame } from './game/save';
@@ -128,6 +128,16 @@
         </span>
       </div>
       {#if $game.era === 'industrial' || $game.era === 'information'}
+        {@const coalAmt = $game.resources.coal ?? 0}
+        {@const coalProd = coalPerSec($game)}
+        {@const coalDrain = coalDrainPerSec($game)}
+        {#if coalProd > 0 || coalAmt > 0 || $game.flags.bessemer}
+          <div class="res">
+            <span class="label">Coal</span>
+            <span class="val">{fmt(coalAmt)} / {fmt(coalCap($game))}</span>
+            <span class="rate">+{fmt(coalProd)} − {fmt(coalDrain)} = {coalProd - coalDrain >= 0 ? '+' : ''}{fmt(coalProd - coalDrain)}/s</span>
+          </div>
+        {/if}
         <div class="res">
           <span class="label">Output</span>
           <span class="val">{fmt(outputAmt)} / {fmt(outputCap($game))}</span>
