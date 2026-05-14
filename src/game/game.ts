@@ -1,0 +1,46 @@
+import { writable, derived, get } from 'svelte/store';
+
+export type EraId = 'agrarian' | 'industrial' | 'information' | 'algorithmic' | 'posthuman' | 'cosmic';
+
+export interface GameState {
+  era: EraId;
+  resources: Record<string, number>;
+  upgrades: Record<string, number>;
+  flags: Record<string, boolean>;
+  log: string[];
+  startedAt: number;
+  lastTick: number;
+}
+
+export const initialState: GameState = {
+  era: 'agrarian',
+  resources: { grain: 0, land: 1, pop: 3 },
+  upgrades: { plow: 0, irrigation: 0, granary: 0 },
+  flags: {},
+  log: ['A small settlement gathers by the river.'],
+  startedAt: Date.now(),
+  lastTick: Date.now(),
+};
+
+export const game = writable<GameState>(initialState);
+
+export function logEvent(msg: string) {
+  game.update(s => ({ ...s, log: [msg, ...s.log].slice(0, 50) }));
+}
+
+export function spend(res: string, amount: number): boolean {
+  const s = get(game);
+  if ((s.resources[res] ?? 0) < amount) return false;
+  game.update(s => ({
+    ...s,
+    resources: { ...s.resources, [res]: s.resources[res] - amount },
+  }));
+  return true;
+}
+
+export function gain(res: string, amount: number) {
+  game.update(s => ({
+    ...s,
+    resources: { ...s.resources, [res]: (s.resources[res] ?? 0) + amount },
+  }));
+}
