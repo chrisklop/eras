@@ -303,7 +303,7 @@
           >
             <div class="row">
               <strong>{displayName}</strong>
-              <span class="lvl">Lv {lvl}{max !== undefined ? `/${max}` : ''}</span>
+              <span class="lvl">× {lvl}{max !== undefined ? ` / ${max}` : ''}</span>
             </div>
             <div class="desc">
               {#if isDwelling}
@@ -340,7 +340,7 @@
             >
               <div class="row">
                 <strong>{u.name}</strong>
-                <span class="lvl">Lv {lvl}{u.max ? `/${u.max}` : ''}</span>
+                <span class="lvl">× {lvl}{u.max ? ` / ${u.max}` : ''}</span>
               </div>
               <div class="desc">{u.desc}</div>
               <div class="cost">
