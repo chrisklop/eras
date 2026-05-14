@@ -145,12 +145,13 @@
         </div>
       {/if}
     </div>
-    <button class="big" on:click={gather}>Gather grain</button>
     <button class="reset" on:click={hardReset}>reset</button>
   </header>
 
   <main class="grid">
     <section class="pane upgrades-pane">
+      <button class="big" on:click={gather}>Gather grain</button>
+
       {#if upgradesHorizon}
         {@const horCost = upgradesHorizon.cost.grain ?? upgradesHorizon.cost.output ?? 0}
         {@const horRes = upgradesHorizon.cost.grain !== undefined ? 'grain' : 'output'}
@@ -387,21 +388,23 @@
   }
 
   .big {
+    display: block;
+    width: 100%;
     background: var(--rubric);
     color: var(--parchment);
     border: 1px solid var(--rubric);
     font-family: var(--font-display);
     font-style: italic;
-    font-size: 0.95rem;
+    font-size: 1.15rem;
     font-variation-settings: var(--display-italic-settings);
     cursor: pointer;
-    padding: 0.55rem 1.25rem;
-    margin-left: auto;
+    padding: 0.85rem 1rem;
+    margin-bottom: 1.25rem;
     letter-spacing: 0.01em;
     transition: transform 120ms ease, box-shadow 200ms ease, background 200ms ease;
     box-shadow: 0 2px 0 var(--shadow);
   }
-  .big:hover { transform: translateY(-1px); box-shadow: 0 4px 0 var(--shadow); }
+  .big:hover { transform: translateY(-1px); box-shadow: 0 4px 0 var(--shadow); background: color-mix(in srgb, var(--rubric) 85%, var(--gilt)); }
   .big:active { transform: translateY(1px); box-shadow: 0 0 0 var(--shadow); }
 
   .reset {

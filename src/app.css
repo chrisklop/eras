@@ -4,17 +4,18 @@
 
 :root {
   /* Era-driven tokens. .era-* class on <body> swaps these. */
-  --ink:           #2a201a;
-  --ink-dim:       #6a5d4a;
-  --parchment:     #f4ead4;
-  --parchment-2:   #ecdfbe;
-  --parchment-3:   #e2cfa3;
-  --vellum:        #d9c190;
-  --rubric:        #8a2f1d;          /* the red ink monks used for capitals */
-  --gilt:          #b8862c;          /* gold leaf */
-  --moss:          #6a7b3e;
-  --shadow:        rgba(67, 47, 22, 0.18);
-  --rule:          #b89765;
+  /* Agrarian: candlelit scriptorium — dark vellum under lamplight. */
+  --ink:           #e4d3a8;
+  --ink-dim:       #9b8662;
+  --parchment:     #1d1610;
+  --parchment-2:   #271e15;
+  --parchment-3:   #32271c;
+  --vellum:        #463524;
+  --rubric:        #c5583a;          /* ember red */
+  --gilt:          #d4a13a;          /* gold leaf, glowing */
+  --moss:          #8a9a5a;
+  --shadow:        rgba(0, 0, 0, 0.45);
+  --rule:          #5c4530;
 
   /* Type system */
   --font-display:  'Fraunces', 'Cormorant Garamond', Georgia, serif;
@@ -75,15 +76,13 @@ body::before {
   inset: 0;
   pointer-events: none;
   z-index: 1;
-  opacity: 0.35;
+  opacity: 0.22;
   background-image:
-    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.2 0 0 0 0 0.15 0 0 0 0 0.1 0 0 0 0.5 0'/></filter><rect width='240' height='240' filter='url(%23n)'/></svg>");
-  mix-blend-mode: multiply;
-}
-.era-industrial body::before,
-.era-information body::before {
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.6 0 0 0 0 0.45 0 0 0 0 0.25 0 0 0 0.5 0'/></filter><rect width='240' height='240' filter='url(%23n)'/></svg>");
   mix-blend-mode: screen;
-  opacity: 0.18;
+}
+.era-information body::before {
+  opacity: 0.15;
 }
 
 /* Tabular numerals everywhere a number appears */
