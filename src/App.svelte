@@ -167,8 +167,14 @@
           <div class="horizon-fill" style="width: {horPct * 100}%"></div>
           <div class="horizon-text">
             <span class="horizon-kicker">Next</span>
-            <span class="horizon-name">{projectAvailable(upgradesHorizon, $game) ? upgradesHorizon.name : '— locked —'}</span>
-            <span class="horizon-cost">{fmt(horHave)} / {fmt(horCost)} {horRes}</span>
+            <span class="horizon-name">{upgradesHorizon.name}</span>
+            <span class="horizon-cost">
+              {#if projectAvailable(upgradesHorizon, $game)}
+                {fmt(horHave)} / {fmt(horCost)} {horRes}
+              {:else}
+                {upgradesHorizon.requirementsText}
+              {/if}
+            </span>
           </div>
         </div>
       {/if}
