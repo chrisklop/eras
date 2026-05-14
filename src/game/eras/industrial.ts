@@ -27,13 +27,15 @@ const FACTORY_OUTPUT_BASE = 1;          // output/sec/factory
 const WORKSHOP_BASE_COST = 2000;
 const WORKSHOP_COST_GROWTH = 1.25;      // each lvl: +20% factory output
 
-const WAREHOUSE_BASE_COST = 1500;       // in output
+// Output-paid buildings: base must be affordable from BASE_OUTPUT_CAP so the
+// player isn't stuck the moment Industrial begins.
+const WAREHOUSE_BASE_COST = 50;         // in output
 const WAREHOUSE_COST_GROWTH = 1.35;
 
-const RAILROAD_BASE_COST = 5000;
+const RAILROAD_BASE_COST = 500;
 const RAILROAD_COST_GROWTH = 1.4;       // each lvl: -10% factory grain drain
 
-const BASE_OUTPUT_CAP = 100;
+const BASE_OUTPUT_CAP = 400;
 const PRE_LOGISTICS_CAP_PER_WAREHOUSE = 200;
 const LOGISTICS_CAP_MULT = 1.5;         // post-Logistics paradigm shift
 

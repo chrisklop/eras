@@ -8,6 +8,7 @@
 // Run: npx tsx scripts/sim.ts
 
 import { agrarianUpgrades, grainCap, popCap, popGrowthPerSec, grainPerSec, grainConsumedPerSec } from '../src/game/eras/agrarian';
+import { industrialUpgrades, outputCap, outputPerSec, grainDrainPerSec } from '../src/game/eras/industrial';
 import { projects, projectAvailable, canAffordProject } from '../src/game/projects';
 import { initialState, type GameState } from '../src/game/game';
 
@@ -36,13 +37,33 @@ function applyProject(s: GameState, projId: string) {
 }
 
 function tick(s: GameState, dt: number) {
+  // Agrarian production / consumption
   const cap = grainCap(s);
-  const net = grainPerSec(s) - grainConsumedPerSec(s);
-  s.resources.grain = Math.max(0, Math.min(cap, (s.resources.grain ?? 0) + net * dt));
+  const grainProd = grainPerSec(s);
+  const grainCons = grainConsumedPerSec(s);
+  let grainDelta = (grainProd - grainCons) * dt;
+
+  // Industrial: factories drain grain → produce output
+  if (s.era === 'industrial' || s.era === 'information') {
+    const factories = s.upgrades.factory ?? 0;
+    if (factories > 0) {
+      const drainRate = grainDrainPerSec(s);
+      const outRate = outputPerSec(s);
+      const oCap = outputCap(s);
+      const grainAvail = Math.max(0, (s.resources.grain ?? 0) + grainDelta);
+      const grainNeeded = drainRate * dt;
+      const grainUsed = Math.min(grainNeeded, grainAvail);
+      const fraction = grainNeeded > 0 ? grainUsed / grainNeeded : 1;
+      const outputGained = outRate * dt * fraction;
+      grainDelta -= grainUsed;
+      s.resources.output = Math.min(oCap, (s.resources.output ?? 0) + outputGained);
+    }
+  }
+  s.resources.grain = Math.max(0, Math.min(cap, (s.resources.grain ?? 0) + grainDelta));
 
   const pop = s.resources.pop ?? 0;
   const pCap = popCap(s);
-  const wellFed = grainPerSec(s) > grainConsumedPerSec(s) && (s.resources.grain ?? 0) > 0;
+  const wellFed = grainProd > grainCons && (s.resources.grain ?? 0) > 0;
   if (wellFed && pop < pCap) {
     s.resources.pop = Math.min(pCap, pop + popGrowthPerSec(s) * dt);
   }
@@ -119,7 +140,7 @@ function simulate(): { phases: PhaseLog[]; violations: string[]; reachedIR: bool
       applyProject(s, p.id);
       logPhase(`project: ${p.name}`);
       lastPurchaseTime = t;
-      if (p.id === 'industrialRevolution') {
+      if (p.id === 'telegraph') {
         return { phases, violations, reachedIR: true, finalState: s, elapsed: t };
       }
       continue;
@@ -127,6 +148,7 @@ function simulate(): { phases: PhaseLog[]; violations: string[]; reachedIR: bool
 
     const cap = grainCap(s);
     const grain = s.resources.grain ?? 0;
+    const output = s.resources.output ?? 0;
 
     // Real wall detection: no purchase for STALL_THRESHOLD_SEC, grain capped,
     // no project completable. Means the player is stuck producing grain that
@@ -152,25 +174,34 @@ function simulate(): { phases: PhaseLog[]; violations: string[]; reachedIR: bool
       return { phases, violations, reachedIR: false, finalState: s, elapsed: t };
     }
 
-    // Greedy buy: find cheapest affordable upgrade.
-    let bestUpgrade: { id: string; cost: number } | null = null;
-    for (const u of agrarianUpgrades) {
-      const lvl = s.upgrades[u.id] ?? 0;
-      if (u.max !== undefined && lvl >= u.max) continue;
-      const c = u.cost(lvl).grain;
-      if (c <= grain && (!bestUpgrade || c < bestUpgrade.cost)) {
-        bestUpgrade = { id: u.id, cost: c };
+    // Greedy buy: find cheapest affordable upgrade across Agrarian + Industrial.
+    type BuyOpt = { id: string; cost: number; res: 'grain' | 'output'; era: 'agrarian' | 'industrial'; name: string };
+    let bestUpgrade: BuyOpt | null = null;
+    const considerSet = (upgrades: typeof agrarianUpgrades, era: 'agrarian' | 'industrial') => {
+      for (const u of upgrades) {
+        const lvl = s.upgrades[u.id] ?? 0;
+        if (u.max !== undefined && lvl >= u.max) continue;
+        const c = u.cost(lvl);
+        const cost = c.grain ?? c.output ?? 0;
+        const res: 'grain' | 'output' = c.grain !== undefined ? 'grain' : 'output';
+        const have = res === 'grain' ? grain : output;
+        if (cost <= have && (!bestUpgrade || cost < bestUpgrade.cost)) {
+          bestUpgrade = { id: u.id, cost, res, era, name: u.name };
+        }
       }
+    };
+    considerSet(agrarianUpgrades, 'agrarian');
+    if (s.era === 'industrial' || s.era === 'information') {
+      considerSet(industrialUpgrades as any, 'industrial');
     }
 
     if (bestUpgrade) {
-      const u = agrarianUpgrades.find(x => x.id === bestUpgrade!.id)!;
-      const lvl = s.upgrades[u.id] ?? 0;
-      spendResource(s, 'grain', bestUpgrade.cost);
-      s.upgrades[u.id] = lvl + 1;
+      const lvl = s.upgrades[bestUpgrade.id] ?? 0;
+      spendResource(s, bestUpgrade.res, bestUpgrade.cost);
+      s.upgrades[bestUpgrade.id] = lvl + 1;
       lastPurchaseTime = t;
       if (lvl === 0 || (lvl + 1) % 5 === 0) {
-        logPhase(`${u.name} → lvl ${lvl + 1}`);
+        logPhase(`${bestUpgrade.name} → lvl ${lvl + 1}`);
       }
     }
   }
@@ -190,7 +221,7 @@ for (const p of result.phases) {
 }
 
 console.log('\n=== Result ===\n');
-console.log(`Reached Industrial Revolution: ${result.reachedIR ? 'YES' : 'NO'}`);
+console.log(`Reached Information era (Telegraph): ${result.reachedIR ? 'YES' : 'NO'}`);
 console.log(`Total simulated time: ${fmtTime(result.elapsed)}`);
 console.log(`Curve violations (cost > cap): ${result.violations.length}`);
 
@@ -204,7 +235,7 @@ if (result.violations.length > 0) {
 }
 
 if (!result.reachedIR) {
-  console.log('\nFAILED: simulation timed out without reaching Industrial Revolution.');
+  console.log('\nFAILED: simulation timed out without reaching the Information era.');
   process.exit(1);
 }
 
