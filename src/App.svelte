@@ -28,6 +28,10 @@
     return ($game.resources.grain ?? 0) >= def.cost(lvl).grain;
   }
 
+  $: grainAmt = $game.resources.grain ?? 0;
+  $: cap = grainCap($game);
+  $: grainFull = grainAmt >= cap - 0.01;
+
   function hardReset() {
     if (confirm('Wipe save and restart?')) {
       resetGame();
@@ -44,13 +48,10 @@
   </header>
 
   <section class="resources">
-    {@const grain = $game.resources.grain ?? 0}
-    {@const cap = grainCap($game)}
-    {@const full = grain >= cap - 0.01}
     <div class="res">
       <span class="label">Grain</span>
-      <span class="val" class:full>{fmt(grain)} / {fmt(cap)}</span>
-      <span class="rate">{full ? 'storage full' : `+${fmt(grainPerSec($game))}/s`}</span>
+      <span class="val" class:full={grainFull}>{fmt(grainAmt)} / {fmt(cap)}</span>
+      <span class="rate">{grainFull ? 'storage full' : `+${fmt(grainPerSec($game))}/s`}</span>
     </div>
     <div class="res">
       <span class="label">Population</span>
