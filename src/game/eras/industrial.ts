@@ -145,8 +145,8 @@ export function buyIndustrialUpgrade(id: string, count: number | 'max' = 1) {
   if (lvl === 0) logEvent(`First ${def.name.toLowerCase()} built.`);
 }
 
-export function nextBulkCost(id: string, count: number | 'max'): { total: number; n: number; res: 'grain' | 'output' } {
-  const s = get(game);
+export function nextBulkCost(id: string, count: number | 'max', state?: GameState): { total: number; n: number; res: 'grain' | 'output' } {
+  const s = state ?? get(game);
   const curve = INDUSTRIAL_CURVES[id];
   if (!curve) return { total: 0, n: 0, res: 'grain' };
   const lvl = s.upgrades[id] ?? 0;

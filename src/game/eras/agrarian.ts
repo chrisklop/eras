@@ -210,8 +210,8 @@ function effectiveMax(id: string, def: Upgrade, s: GameState): number | undefine
   return def.max;
 }
 
-export function nextAgrarianBulkCost(id: string, count: number | 'max'): { total: number; n: number } {
-  const s = get(game);
+export function nextAgrarianBulkCost(id: string, count: number | 'max', state?: GameState): { total: number; n: number } {
+  const s = state ?? get(game);
   const curve = UPGRADE_CURVES[id];
   if (!curve) return { total: 0, n: 0 };
   const lvl = s.upgrades[id] ?? 0;
