@@ -119,10 +119,11 @@ export function grainCap(s: GameState = get(game)): number {
   const granaries = s.upgrades.granary ?? 0;
   const base = BASE_GRAIN_CAP + (s.flags.wattleFences ? WATTLE_FENCES_BONUS : 0);
   const legacyMult = legacyGrainCapMultiplier();
+  const wonderMult = s.flags.pyramids ? 2 : 1;
   if (s.flags.pottery) {
-    return Math.floor(base * legacyMult * Math.pow(POTTERY_CAP_MULT, granaries));
+    return Math.floor(base * legacyMult * wonderMult * Math.pow(POTTERY_CAP_MULT, granaries));
   }
-  return Math.floor((base + PRE_POTTERY_CAP_PER_GRANARY * granaries) * legacyMult);
+  return Math.floor((base + PRE_POTTERY_CAP_PER_GRANARY * granaries) * legacyMult * wonderMult);
 }
 
 export function popCap(s: GameState = get(game)): number {
@@ -137,7 +138,8 @@ export function dwellingMaxLevel(s: GameState = get(game)): number {
 export function popGrowthPerSec(s: GameState = get(game)): number {
   const dwellings = s.upgrades.dwelling ?? 0;
   const compassBoost = s.flags.compass ? 0.5 : 0;
-  return Math.min(MAX_POP_GROWTH, BASE_POP_GROWTH + POP_GROWTH_PER_DWELLING * dwellings + compassBoost + legacyPopGrowthBonus());
+  const wonderBoost = s.flags.stonehenge ? 0.5 : 0;
+  return Math.min(MAX_POP_GROWTH, BASE_POP_GROWTH + POP_GROWTH_PER_DWELLING * dwellings + compassBoost + legacyPopGrowthBonus() + wonderBoost);
 }
 
 // Labor demand — every building needs workers from population.
@@ -182,6 +184,7 @@ export function consumptionPerPop(s: GameState = get(game)): number {
     granaries * GRANARY_CONSUMPTION_REDUCTION_PER,
   );
   mult *= 1 - granaryRed;
+  if (s.flags.hangingGardens) mult *= 0.8;
   return BASE_FOOD_PER_POP * mult;
 }
 

@@ -14,6 +14,8 @@ export interface Project {
   onComplete?: () => void;
   /** Looser predicate: when the card should be visible at all. Defaults to requires. */
   visible?: (s: GameState) => boolean;
+  /** Wonders render in their own pane and have visual prominence. */
+  wonder?: boolean;
 }
 
 export function projectVisible(p: Project, s: GameState): boolean {
@@ -345,6 +347,122 @@ export const projects: Project[] = [
       logEvent('A network of networks awakens. The age of code begins.');
     },
     visible: s => !!s.completedProjects.radio,
+  },
+
+  // ============================== Wonders ==============================
+
+  // Agrarian wonders
+  {
+    id: 'stonehenge',
+    name: 'Stonehenge',
+    desc: 'Mark the year. Standing stones aligned to the solstice. +50% population growth, permanent.',
+    cost: { grain: 2000 },
+    era: 'agrarian',
+    requires: s => (s.upgrades.plow ?? 0) >= 5,
+    requirementsText: 'Requires 5 plows',
+    apply: s => ({ flags: { ...s.flags, stonehenge: true } }),
+    visible: s => (s.upgrades.plow ?? 0) >= 3,
+    wonder: true,
+  },
+  {
+    id: 'pyramids',
+    name: 'The Pyramids',
+    desc: 'A pharaoh\'s eternity. Carved tombs taller than mountains. ×2 grain storage cap.',
+    cost: { grain: 15000 },
+    era: 'agrarian',
+    requires: s => !!s.completedProjects.writing,
+    requirementsText: 'Requires Writing',
+    apply: s => ({ flags: { ...s.flags, pyramids: true } }),
+    visible: s => !!s.completedProjects.writing,
+    wonder: true,
+  },
+  {
+    id: 'hangingGardens',
+    name: 'Hanging Gardens',
+    desc: 'Tiered orchards drinking from canals. Citizens consume 20% less grain.',
+    cost: { grain: 30000 },
+    era: 'agrarian',
+    requires: s => !!s.completedProjects.cropRotation && (s.resources.pop ?? 0) >= 50,
+    requirementsText: 'Requires Crop Rotation, 50 pop',
+    apply: s => ({ flags: { ...s.flags, hangingGardens: true } }),
+    visible: s => !!s.completedProjects.cropRotation,
+    wonder: true,
+  },
+
+  // Industrial wonders
+  {
+    id: 'crystalPalace',
+    name: 'Crystal Palace',
+    desc: 'Iron and glass, the cathedral of industry. ×1.5 Goods storage.',
+    cost: { output: 8000 },
+    era: 'industrial',
+    requires: s => s.era === 'industrial' && !!s.completedProjects.massProduction,
+    requirementsText: 'Requires Mass Production',
+    apply: s => ({ flags: { ...s.flags, crystalPalace: true } }),
+    visible: s => !!s.completedProjects.massProduction,
+    wonder: true,
+  },
+  {
+    id: 'eiffelTower',
+    name: 'Eiffel Tower',
+    desc: 'Lattice-iron pinnacle. National pride lifts factory output by +25%.',
+    cost: { output: 40000 },
+    era: 'industrial',
+    requires: s => s.era === 'industrial' && !!s.completedProjects.electricity,
+    requirementsText: 'Requires Electricity',
+    apply: s => ({ flags: { ...s.flags, eiffelTower: true } }),
+    visible: s => !!s.completedProjects.electricity,
+    wonder: true,
+  },
+  {
+    id: 'transcontinentalRailroad',
+    name: 'Transcontinental Railroad',
+    desc: 'Steel rails coast to coast. Factory grain drain halved.',
+    cost: { output: 100000 },
+    era: 'industrial',
+    requires: s => s.era === 'industrial' && !!s.completedProjects.logistics,
+    requirementsText: 'Requires Logistics',
+    apply: s => ({ flags: { ...s.flags, transcontinentalRailroad: true } }),
+    visible: s => !!s.completedProjects.logistics,
+    wonder: true,
+  },
+
+  // Information wonders
+  {
+    id: 'statueOfLiberty',
+    name: 'Statue of Liberty',
+    desc: 'Beacon over the harbor. ×1.5 Insight storage.',
+    cost: { insight: 4000 },
+    era: 'information',
+    requires: s => s.era === 'information' && !!s.completedProjects.telegraphNetwork,
+    requirementsText: 'Requires Telegraph Network',
+    apply: s => ({ flags: { ...s.flags, statueOfLiberty: true } }),
+    visible: s => !!s.completedProjects.telegraphNetwork,
+    wonder: true,
+  },
+  {
+    id: 'empireState',
+    name: 'Empire State Building',
+    desc: 'A hundred and two stories of ambition. Signal stations produce +25% Insight.',
+    cost: { insight: 40000 },
+    era: 'information',
+    requires: s => s.era === 'information' && !!s.completedProjects.radio,
+    requirementsText: 'Requires Radio',
+    apply: s => ({ flags: { ...s.flags, empireState: true } }),
+    visible: s => !!s.completedProjects.radio,
+    wonder: true,
+  },
+  {
+    id: 'hooverDam',
+    name: 'Hoover Dam',
+    desc: 'Concrete arch holding back a desert river. Station Goods drain halved.',
+    cost: { insight: 150000 },
+    era: 'information',
+    requires: s => s.era === 'information' && !!s.completedProjects.mechanicalComputing,
+    requirementsText: 'Requires Mechanical Computing',
+    apply: s => ({ flags: { ...s.flags, hooverDam: true } }),
+    visible: s => !!s.completedProjects.mechanicalComputing,
+    wonder: true,
   },
 ];
 

@@ -123,10 +123,11 @@ export const industrialUpgrades: IndustrialUpgrade[] = [
 
 export function outputCap(s: GameState = get(game)): number {
   const warehouses = s.upgrades.warehouse ?? 0;
+  const wonderMult = s.flags.crystalPalace ? 1.5 : 1;
   if (s.flags.logistics) {
-    return Math.floor(BASE_OUTPUT_CAP * Math.pow(LOGISTICS_CAP_MULT, warehouses));
+    return Math.floor(BASE_OUTPUT_CAP * wonderMult * Math.pow(LOGISTICS_CAP_MULT, warehouses));
   }
-  return BASE_OUTPUT_CAP + PRE_LOGISTICS_CAP_PER_WAREHOUSE * warehouses;
+  return Math.floor((BASE_OUTPUT_CAP + PRE_LOGISTICS_CAP_PER_WAREHOUSE * warehouses) * wonderMult);
 }
 
 export function coalCap(s: GameState = get(game)): number {
@@ -142,10 +143,11 @@ export function coalPerSec(s: GameState = get(game)): number {
   return (s.upgrades.mine ?? 0) * COAL_PER_MINE * mineStaticMult(s) * labor;
 }
 
-/** Full multiplier on factory output (workshops + project flags). */
+/** Full multiplier on factory output (workshops + project flags + wonders). */
 export function factoryStaticMult(s: GameState = get(game)): number {
   const workshops = s.upgrades.workshop ?? 0;
-  return Math.pow(WORKSHOP_PER_LEVEL, workshops) * factoryCostMult(s);
+  const wonderMult = s.flags.eiffelTower ? 1.25 : 1;
+  return Math.pow(WORKSHOP_PER_LEVEL, workshops) * factoryCostMult(s) * wonderMult;
 }
 
 /** Bounded cost multiplier — project flags only, no level compounding. */
@@ -166,7 +168,8 @@ export function factoryOutputMult(s: GameState = get(game)): number {
 
 export function factoryGrainMult(s: GameState = get(game)): number {
   const railroads = Math.min(7, s.upgrades.railroad ?? 0);
-  return Math.max(0.3, 1 - 0.1 * railroads);
+  const base = Math.max(0.3, 1 - 0.1 * railroads);
+  return s.flags.transcontinentalRailroad ? base * 0.5 : base;
 }
 
 export function coalDrainPerSec(s: GameState = get(game)): number {

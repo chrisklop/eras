@@ -72,7 +72,9 @@
   $: grainConsumption = grainConsumedPerSec($game);
   $: grainNet = grainProduction - grainConsumption;
   $: perPop = consumptionPerPop($game);
-  $: visibleProjects = projects.filter(p => projectVisible(p, $game));
+  $: visibleProjects = projects.filter(p => projectVisible(p, $game) && !p.wonder);
+  $: visibleWonders = projects.filter(p => projectVisible(p, $game) && p.wonder);
+  $: builtWonders = projects.filter(p => p.wonder && $game.completedProjects[p.id]);
   $: visibleIndustrialUpgrades = industrialUpgrades.filter(u => industrialUpgradeVisible(u, $game));
   $: visibleInformationUpgrades = informationUpgrades.filter(u => informationUpgradeVisible(u, $game));
   $: insightAmt = $game.resources.insight ?? 0;
@@ -447,6 +449,50 @@
         </button>
       {/each}
       </div>
+
+      {#if visibleWonders.length > 0 || builtWonders.length > 0}
+        <div class="pane-head wonders-head">
+          <h2 class="sub">Wonders {builtWonders.length > 0 ? `(${builtWonders.length} built)` : ''}</h2>
+        </div>
+        <div class="card-grid">
+          {#each visibleWonders as p (p.id)}
+            {@const unlocked = projectAvailable(p, $game)}
+            {@const eff = effectiveProjectCost(p)}
+            {@const grainOk = eff.grain === undefined || grainAmt >= eff.grain}
+            {@const outputOk = eff.output === undefined || outputAmt >= eff.output}
+            {@const insightOk = eff.insight === undefined || insightAmt >= eff.insight}
+            {@const affordable = grainOk && outputOk && insightOk}
+            <button
+              class="project wonder"
+              class:locked={!unlocked}
+              disabled={!unlocked || !affordable}
+              on:click={() => completeProject(p.id)}
+            >
+              <div class="row">
+                <strong>{unlocked ? p.name : '???'}</strong>
+                <span class="wonder-tag">wonder</span>
+              </div>
+              <div class="desc">{unlocked ? p.desc : p.requirementsText}</div>
+              <div class="cost">
+                {#if unlocked}
+                  {eff.grain !== undefined ? `${fmt(eff.grain)} grain` : ''}
+                  {eff.output !== undefined ? ` ${fmt(eff.output)} goods` : ''}
+                  {eff.insight !== undefined ? ` ${fmt(eff.insight)} insight` : ''}
+                {/if}
+              </div>
+            </button>
+          {/each}
+          {#each builtWonders as p (p.id)}
+            <div class="project wonder built">
+              <div class="row">
+                <strong>{p.name}</strong>
+                <span class="wonder-tag">built</span>
+              </div>
+              <div class="desc">{p.desc}</div>
+            </div>
+          {/each}
+        </div>
+      {/if}
     </section>
   </main>
 
@@ -854,6 +900,24 @@
     display: block; font-size: 0.7rem; letter-spacing: 0.1em;
     text-transform: uppercase; opacity: 0.65; margin-top: 0.25rem;
     font-family: var(--font-mono, monospace);
+  }
+
+  .wonders-head h2 { color: var(--gilt, #d4a13a); }
+  .project.wonder {
+    border-color: var(--gilt, #d4a13a);
+    background: linear-gradient(180deg, rgba(212,161,58,0.10) 0%, rgba(212,161,58,0.03) 100%);
+  }
+  .project.wonder:disabled { background: rgba(212,161,58,0.04); }
+  .project.wonder strong { color: var(--gilt, #d4a13a); letter-spacing: 0.04em; }
+  .project.wonder.built {
+    border-color: var(--gilt, #d4a13a);
+    background: rgba(212,161,58,0.18);
+    cursor: default;
+  }
+  .wonder-tag {
+    font-size: 0.6rem; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--gilt, #d4a13a); opacity: 0.85;
+    border: 1px solid var(--gilt, #d4a13a); padding: 0.05rem 0.4rem; border-radius: 2px;
   }
 
   .legacy-chip {

@@ -91,10 +91,11 @@ export function informationUpgradeVisible(u: InformationUpgrade, s: GameState): 
 
 export function insightCap(s: GameState = get(game)): number {
   const archives = s.upgrades.archive ?? 0;
+  const wonderMult = s.flags.statueOfLiberty ? 1.5 : 1;
   if (s.flags.movableType) {
-    return Math.floor(BASE_INSIGHT_CAP * Math.pow(MOVABLE_TYPE_CAP_MULT, archives));
+    return Math.floor(BASE_INSIGHT_CAP * wonderMult * Math.pow(MOVABLE_TYPE_CAP_MULT, archives));
   }
-  return BASE_INSIGHT_CAP + PRE_MOVABLE_TYPE_CAP_PER_ARCHIVE * archives;
+  return Math.floor((BASE_INSIGHT_CAP + PRE_MOVABLE_TYPE_CAP_PER_ARCHIVE * archives) * wonderMult);
 }
 
 export function wireMax(s: GameState = get(game)): number {
@@ -111,7 +112,8 @@ export function stationCostMult(s: GameState = get(game)): number {
 
 export function stationStaticMult(s: GameState = get(game)): number {
   const presses = s.upgrades.printingPress ?? 0;
-  return Math.pow(PRESS_PER_LEVEL, presses) * stationCostMult(s);
+  const wonderMult = s.flags.empireState ? 1.25 : 1;
+  return Math.pow(PRESS_PER_LEVEL, presses) * stationCostMult(s) * wonderMult;
 }
 
 export function laborInfoDemand(s: GameState = get(game)): number {
@@ -121,7 +123,8 @@ export function laborInfoDemand(s: GameState = get(game)): number {
 export function stationGoodsDrainPerSec(s: GameState = get(game)): number {
   const wires = Math.min(wireMax(s), s.upgrades.wireNetwork ?? 0);
   const reduction = Math.max(0.3, 1 - 0.1 * wires);
-  return (s.upgrades.signalStation ?? 0) * STATION_GOODS_DRAIN * reduction;
+  const wonderMult = s.flags.hooverDam ? 0.5 : 1;
+  return (s.upgrades.signalStation ?? 0) * STATION_GOODS_DRAIN * reduction * wonderMult;
 }
 
 export function insightPerSec(s: GameState = get(game)): number {
