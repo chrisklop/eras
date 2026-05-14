@@ -57,6 +57,10 @@
   $: grainNet = grainProduction - grainConsumption;
   $: perPop = consumptionPerPop($game);
   $: visibleProjects = projects.filter(p => projectIncomplete(p, $game));
+  $: laborDemandVal = laborDemand($game);
+  $: laborFractionVal = laborFraction($game);
+  $: idleWorkers = Math.max(0, Math.floor(popAmt - laborDemandVal));
+  $: shortWorkers = Math.max(0, Math.ceil(laborDemandVal - popAmt));
   $: completedCount = Object.keys($game.completedProjects ?? {}).length;
 
   const buyModes: BuyMode[] = [1, 10, 100, 'max'];
@@ -117,16 +121,12 @@
           +{fmt(grainProduction)} − {fmt(grainConsumption)} = {grainNet >= 0 ? '+' : ''}{fmt(grainNet)}/s
         </span>
       </div>
-      {@const demand = laborDemand($game)}
-      {@const labor = laborFraction($game)}
-      {@const idle = Math.max(0, Math.floor(popAmt - demand))}
-      {@const short = Math.max(0, Math.ceil(demand - popAmt))}
       <div class="res">
         <span class="label">Population</span>
-        <span class="val" class:full={popAmt >= popMax} class:starving={short > 0}>{Math.floor(popAmt)} / {popMax}</span>
+        <span class="val" class:full={popAmt >= popMax} class:starving={shortWorkers > 0}>{Math.floor(popAmt)} / {popMax}</span>
         <span class="rate">
-          {#if short > 0}{short} jobs unmanned · {Math.round(labor * 100)}%
-          {:else if idle > 0}{idle} idle · ready to work
+          {#if shortWorkers > 0}{shortWorkers} unmanned · {Math.round(laborFractionVal * 100)}%
+          {:else if idleWorkers > 0}{idleWorkers} idle · ready
           {:else if grainNet <= 0 && grainAmt < 1}underfed
           {:else if popAmt >= popMax}housing full
           {:else if grainNet > 0 && grainAmt > 0}growing
