@@ -121,14 +121,30 @@ export function popGrowthPerSec(s: GameState = get(game)): number {
   return Math.min(MAX_POP_GROWTH, BASE_POP_GROWTH + POP_GROWTH_PER_DWELLING * dwellings + compassBoost);
 }
 
-/**
- * Population scales factory output: above 100 pop, each extra pop = +1% factory
- * output, capped at +200% (so 300 pop = 3×). Industrial-era reward for housing.
- */
-export function popFactoryMultiplier(s: GameState = get(game)): number {
+// Labor demand — every building needs workers from population.
+const WORKERS_PER_PLOW = 1;
+const WORKERS_PER_MINE = 2;
+const WORKERS_PER_FACTORY = 5;
+
+export function laborDemand(s: GameState = get(game)): number {
+  return (
+    (s.upgrades.plow ?? 0) * WORKERS_PER_PLOW +
+    (s.upgrades.mine ?? 0) * WORKERS_PER_MINE +
+    (s.upgrades.factory ?? 0) * WORKERS_PER_FACTORY
+  );
+}
+
+/** Fraction of workers available vs needed. 1 = fully manned. */
+export function laborFraction(s: GameState = get(game)): number {
+  const demand = laborDemand(s);
+  if (demand <= 0) return 1;
   const pop = s.resources.pop ?? 0;
-  const bonus = Math.max(0, Math.min(2, (pop - 100) * 0.01));
-  return 1 + bonus;
+  return Math.min(1, pop / demand);
+}
+
+/** Population scales production via labor. Pre-existing factory bonus retired. */
+export function popFactoryMultiplier(s: GameState = get(game)): number {
+  return laborFraction(s);
 }
 
 /** Per-pop grain consumption per second, after all tech reductions. */
@@ -157,8 +173,13 @@ export function grainPerSec(s: GameState = get(game)): number {
   const irrig = s.upgrades.irrigation ?? 0;
   const cropMult = s.flags.cropRotation ? 2 : 1;
   const toolMult = s.flags.bronzeTools ? 3 : 1;
-  const plowOutput = plows * Math.pow(2, irrig) * cropMult * toolMult;
-  const popOutput = s.flags.writing ? (s.resources.pop ?? 0) * 0.5 : 0;
+  const labor = laborFraction(s);
+  const plowOutput = plows * Math.pow(2, irrig) * cropMult * toolMult * labor;
+  // Pop's grain contribution: surplus workers (beyond plow demand) gather a
+  // little on their own. Writing gives all citizens a productivity boost.
+  const surplus = Math.max(0, (s.resources.pop ?? 0) - laborDemand(s));
+  const popBase = s.flags.writing ? 0.5 : 0.1;
+  const popOutput = surplus * popBase;
   return plowOutput + popOutput;
 }
 

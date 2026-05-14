@@ -17,7 +17,7 @@
 
 import { get } from 'svelte/store';
 import { game, spend, logEvent, type GameState } from '../game';
-import { bulkCost, affordableCount, popFactoryMultiplier } from './agrarian';
+import { bulkCost, affordableCount, popFactoryMultiplier, laborFraction } from './agrarian';
 
 const FACTORY_BASE_COST = 1500;
 const FACTORY_COST_GROWTH = 1.3;
@@ -120,7 +120,8 @@ export function coalCap(s: GameState = get(game)): number {
 }
 
 export function coalPerSec(s: GameState = get(game)): number {
-  return (s.upgrades.mine ?? 0) * COAL_PER_MINE * (s.flags.steelMills ? 2 : 1);
+  const labor = laborFraction(s);
+  return (s.upgrades.mine ?? 0) * COAL_PER_MINE * (s.flags.steelMills ? 2 : 1) * labor;
 }
 
 export function factoryOutputMult(s: GameState = get(game)): number {

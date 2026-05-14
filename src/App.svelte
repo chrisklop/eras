@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { game, logEvent, buyMode, type BuyMode } from './game/game';
-  import { agrarianUpgrades, buyUpgrade, nextAgrarianBulkCost, grainPerSec, grainConsumedPerSec, consumptionPerPop, grainCap, popCap, gatherGrain, currentHousingTier, dwellingMaxLevel } from './game/eras/agrarian';
+  import { agrarianUpgrades, buyUpgrade, nextAgrarianBulkCost, grainPerSec, grainConsumedPerSec, consumptionPerPop, grainCap, popCap, gatherGrain, currentHousingTier, dwellingMaxLevel, laborDemand, laborFraction } from './game/eras/agrarian';
   import { industrialUpgrades, buyIndustrialUpgrade, nextBulkCost, outputPerSec, grainDrainPerSec, outputCap, coalCap, coalPerSec, coalDrainPerSec } from './game/eras/industrial';
   import { projects, projectAvailable, projectIncomplete, completeProject } from './game/projects';
   import { startLoop, stopLoop } from './game/tick';
@@ -117,11 +117,17 @@
           +{fmt(grainProduction)} − {fmt(grainConsumption)} = {grainNet >= 0 ? '+' : ''}{fmt(grainNet)}/s
         </span>
       </div>
+      {@const demand = laborDemand($game)}
+      {@const labor = laborFraction($game)}
+      {@const idle = Math.max(0, Math.floor(popAmt - demand))}
+      {@const short = Math.max(0, Math.ceil(demand - popAmt))}
       <div class="res">
         <span class="label">Population</span>
-        <span class="val" class:full={popAmt >= popMax}>{Math.floor(popAmt)} / {popMax}</span>
+        <span class="val" class:full={popAmt >= popMax} class:starving={short > 0}>{Math.floor(popAmt)} / {popMax}</span>
         <span class="rate">
-          {#if grainNet <= 0 && grainAmt < 1}underfed
+          {#if short > 0}{short} jobs unmanned · {Math.round(labor * 100)}%
+          {:else if idle > 0}{idle} idle · ready to work
+          {:else if grainNet <= 0 && grainAmt < 1}underfed
           {:else if popAmt >= popMax}housing full
           {:else if grainNet > 0 && grainAmt > 0}growing
           {:else}stable{/if}
