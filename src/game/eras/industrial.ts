@@ -1,3 +1,20 @@
+// =============================================================================
+// Era-extension recipe — follow this for every new era after Industrial.
+//
+// 1. Introduce a NEW primary currency (Output for this era; later: Influence,
+//    Compute, Substrate, Mass). Add it to initialState.resources.
+//
+// 2. Add a STORAGE BUILDING with the same pre/post-paradigm-shift pattern as
+//    granaries: linear cap first, paradigm-shift project flips it to
+//    exponential. Invariant: storage_cap_mult >= upgrade_cost_mult.
+//
+// 3. Add at least one GLOBAL MULTIPLIER project so prior eras' production
+//    stays relevant when this era's costs balloon.
+//
+// 4. Wire the era's tick into src/game/tick.ts. Earlier eras keep ticking
+//    (their resources feed the new economy).
+// =============================================================================
+
 import { get } from 'svelte/store';
 import { game, spend, logEvent } from '../game';
 

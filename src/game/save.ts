@@ -1,8 +1,8 @@
 import type { GameState } from './game';
 import { game, initialState } from './game';
 
-const KEY = 'eras:save:v2';
-const OLD_KEYS = ['eras:save:v1'];
+const KEY = 'eras:save:v3';
+const OLD_KEYS = ['eras:save:v2', 'eras:save:v1'];
 
 export function saveState(s: GameState) {
   try {
