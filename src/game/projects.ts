@@ -12,6 +12,14 @@ export interface Project {
   requirementsText: string;
   apply: (s: GameState) => Partial<GameState>;
   onComplete?: () => void;
+  /** Looser predicate: when the card should be visible at all. Defaults to requires. */
+  visible?: (s: GameState) => boolean;
+}
+
+export function projectVisible(p: Project, s: GameState): boolean {
+  if (s.completedProjects[p.id]) return false;
+  if (p.requires(s)) return true;
+  return p.visible ? p.visible(s) : false;
 }
 
 export const projects: Project[] = [
@@ -24,16 +32,7 @@ export const projects: Project[] = [
     requires: s => (s.upgrades.plow ?? 0) >= 3,
     requirementsText: 'Requires 3 plows',
     apply: s => ({ flags: { ...s.flags, wattleFences: true } }),
-  },
-  {
-    id: 'cropRotation',
-    name: 'Crop Rotation',
-    desc: 'Alternate fields to keep the soil alive. Plows produce 2× base output.',
-    cost: { grain: 300 },
-    era: 'agrarian',
-    requires: s => (s.upgrades.irrigation ?? 0) >= 2,
-    requirementsText: 'Requires 2 irrigation ditches',
-    apply: s => ({ flags: { ...s.flags, cropRotation: true } }),
+    visible: s => (s.upgrades.plow ?? 0) >= 1,
   },
   {
     id: 'pottery',
@@ -44,6 +43,18 @@ export const projects: Project[] = [
     requires: s => (s.upgrades.granary ?? 0) >= 1,
     requirementsText: 'Requires 1 granary',
     apply: s => ({ flags: { ...s.flags, pottery: true } }),
+    visible: s => (s.upgrades.plow ?? 0) >= 2,
+  },
+  {
+    id: 'cropRotation',
+    name: 'Crop Rotation',
+    desc: 'Alternate fields to keep the soil alive. Plows produce 2× base output.',
+    cost: { grain: 300 },
+    era: 'agrarian',
+    requires: s => (s.upgrades.irrigation ?? 0) >= 2,
+    requirementsText: 'Requires 2 irrigation ditches',
+    apply: s => ({ flags: { ...s.flags, cropRotation: true } }),
+    visible: s => (s.upgrades.irrigation ?? 0) >= 1,
   },
   {
     id: 'masonry',
@@ -54,16 +65,7 @@ export const projects: Project[] = [
     requires: s => !!s.completedProjects.pottery,
     requirementsText: 'Requires Pottery',
     apply: s => ({ flags: { ...s.flags, masonry: true } }),
-  },
-  {
-    id: 'cityPlanning',
-    name: 'City Planning',
-    desc: 'Roads, water, sewers. Insulae: each holds 25, max 50.',
-    cost: { grain: 3000 },
-    era: 'agrarian',
-    requires: s => !!s.completedProjects.masonry,
-    requirementsText: 'Requires Masonry',
-    apply: s => ({ flags: { ...s.flags, cityPlanning: true } }),
+    visible: s => !!s.completedProjects.pottery,
   },
   {
     id: 'threeField',
@@ -74,6 +76,18 @@ export const projects: Project[] = [
     requires: s => !!s.completedProjects.cropRotation,
     requirementsText: 'Requires Crop Rotation',
     apply: s => ({ flags: { ...s.flags, threeField: true } }),
+    visible: s => !!s.completedProjects.cropRotation,
+  },
+  {
+    id: 'cityPlanning',
+    name: 'City Planning',
+    desc: 'Roads, water, sewers. Insulae: each holds 25, max 50.',
+    cost: { grain: 3000 },
+    era: 'agrarian',
+    requires: s => !!s.completedProjects.masonry,
+    requirementsText: 'Requires Masonry',
+    apply: s => ({ flags: { ...s.flags, cityPlanning: true } }),
+    visible: s => !!s.completedProjects.masonry,
   },
   {
     id: 'bronzeTools',
@@ -84,6 +98,7 @@ export const projects: Project[] = [
     requires: s => (s.upgrades.plow ?? 0) >= 10,
     requirementsText: 'Requires 10 plows',
     apply: s => ({ flags: { ...s.flags, bronzeTools: true } }),
+    visible: s => (s.upgrades.plow ?? 0) >= 6,
   },
   {
     id: 'plowAgriculture',
@@ -94,6 +109,7 @@ export const projects: Project[] = [
     requires: s => !!s.completedProjects.bronzeTools,
     requirementsText: 'Requires Bronze Tools',
     apply: s => ({ flags: { ...s.flags, plowAgriculture: true } }),
+    visible: s => !!s.completedProjects.bronzeTools,
   },
   {
     id: 'writing',
@@ -104,6 +120,7 @@ export const projects: Project[] = [
     requires: s => (s.resources.pop ?? 0) >= 30,
     requirementsText: 'Requires 30 population',
     apply: s => ({ flags: { ...s.flags, writing: true } }),
+    visible: s => (s.resources.pop ?? 0) >= 15,
   },
   {
     id: 'compass',
@@ -114,6 +131,7 @@ export const projects: Project[] = [
     requires: s => !!s.completedProjects.bronzeTools && !!s.completedProjects.writing,
     requirementsText: 'Requires Bronze Tools, Writing',
     apply: s => ({ flags: { ...s.flags, compass: true } }),
+    visible: s => !!s.completedProjects.bronzeTools || !!s.completedProjects.writing,
   },
   {
     id: 'industrialRevolution',
@@ -131,6 +149,7 @@ export const projects: Project[] = [
     onComplete: () => {
       logEvent('Smoke rises. The age of grain ends.');
     },
+    visible: s => !!s.completedProjects.compass,
   },
 
   // ============================== Industrial era ==============================
@@ -144,56 +163,7 @@ export const projects: Project[] = [
     requires: s => s.era === 'industrial' && (s.upgrades.factory ?? 0) >= 3 && (s.upgrades.mine ?? 0) >= 1,
     requirementsText: 'Requires 3 factories, 1 mine',
     apply: s => ({ flags: { ...s.flags, bessemer: true } }),
-  },
-  {
-    id: 'massProduction',
-    name: 'Mass Production',
-    desc: 'Standard parts, assembly lines. Factories produce 2× output.',
-    cost: { output: 1200 },
-    era: 'industrial',
-    requires: s => s.era === 'industrial' && (s.upgrades.factory ?? 0) >= 4,
-    requirementsText: 'Requires 4 factories',
-    apply: s => ({ flags: { ...s.flags, massProduction: true } }),
-  },
-  {
-    id: 'logistics',
-    name: 'Logistics',
-    desc: 'Ledgers, trains, schedules. Warehouses multiply storage instead of adding to it.',
-    cost: { output: 3000 },
-    era: 'industrial',
-    requires: s => s.era === 'industrial' && (s.upgrades.warehouse ?? 0) >= 3,
-    requirementsText: 'Requires 3 warehouses',
-    apply: s => ({ flags: { ...s.flags, logistics: true } }),
-  },
-  {
-    id: 'refining',
-    name: 'Coal Refining',
-    desc: 'Coke ovens, gas works. Coal Yards multiply storage instead of adding to it.',
-    cost: { output: 2000 },
-    era: 'industrial',
-    requires: s => s.era === 'industrial' && (s.upgrades.coalYard ?? 0) >= 3,
-    requirementsText: 'Requires 3 coal yards',
-    apply: s => ({ flags: { ...s.flags, refining: true } }),
-  },
-  {
-    id: 'steelMills',
-    name: 'Steel Mills',
-    desc: 'Vertical integration. Coal mines produce 2× coal.',
-    cost: { output: 4000 },
-    era: 'industrial',
-    requires: s => s.era === 'industrial' && !!s.completedProjects.bessemer && (s.upgrades.mine ?? 0) >= 8,
-    requirementsText: 'Requires Bessemer, 8 mines',
-    apply: s => ({ flags: { ...s.flags, steelMills: true } }),
-  },
-  {
-    id: 'electricity',
-    name: 'Electricity',
-    desc: 'Wire the cities. Factory output doubles again.',
-    cost: { output: 25000 },
-    era: 'industrial',
-    requires: s => s.era === 'industrial' && !!s.completedProjects.massProduction && (s.upgrades.factory ?? 0) >= 12,
-    requirementsText: 'Requires Mass Production, 12 factories',
-    apply: s => ({ flags: { ...s.flags, electricity: true } }),
+    visible: s => s.era === 'industrial' && (s.upgrades.factory ?? 0) >= 2,
   },
   {
     id: 'tenements',
@@ -204,6 +174,62 @@ export const projects: Project[] = [
     requires: s => s.era === 'industrial' && (s.upgrades.factory ?? 0) >= 5,
     requirementsText: 'Requires 5 factories',
     apply: s => ({ flags: { ...s.flags, tenements: true } }),
+    visible: s => s.era === 'industrial' && (s.upgrades.factory ?? 0) >= 3,
+  },
+  {
+    id: 'massProduction',
+    name: 'Mass Production',
+    desc: 'Standard parts, assembly lines. Factories produce 2× output.',
+    cost: { output: 1200 },
+    era: 'industrial',
+    requires: s => s.era === 'industrial' && (s.upgrades.factory ?? 0) >= 4,
+    requirementsText: 'Requires 4 factories',
+    apply: s => ({ flags: { ...s.flags, massProduction: true } }),
+    visible: s => s.era === 'industrial' && (s.upgrades.factory ?? 0) >= 3,
+  },
+  {
+    id: 'logistics',
+    name: 'Logistics',
+    desc: 'Ledgers, trains, schedules. Warehouses multiply storage instead of adding to it.',
+    cost: { output: 3000 },
+    era: 'industrial',
+    requires: s => s.era === 'industrial' && (s.upgrades.warehouse ?? 0) >= 3,
+    requirementsText: 'Requires 3 warehouses',
+    apply: s => ({ flags: { ...s.flags, logistics: true } }),
+    visible: s => s.era === 'industrial' && (s.upgrades.warehouse ?? 0) >= 1,
+  },
+  {
+    id: 'refining',
+    name: 'Coal Refining',
+    desc: 'Coke ovens, gas works. Coal Yards multiply storage instead of adding to it.',
+    cost: { output: 2000 },
+    era: 'industrial',
+    requires: s => s.era === 'industrial' && (s.upgrades.coalYard ?? 0) >= 3,
+    requirementsText: 'Requires 3 coal yards',
+    apply: s => ({ flags: { ...s.flags, refining: true } }),
+    visible: s => s.era === 'industrial' && (s.upgrades.coalYard ?? 0) >= 1,
+  },
+  {
+    id: 'steelMills',
+    name: 'Steel Mills',
+    desc: 'Vertical integration. Coal mines produce 2× coal.',
+    cost: { output: 4000 },
+    era: 'industrial',
+    requires: s => s.era === 'industrial' && !!s.completedProjects.bessemer && (s.upgrades.mine ?? 0) >= 8,
+    requirementsText: 'Requires Bessemer, 8 mines',
+    apply: s => ({ flags: { ...s.flags, steelMills: true } }),
+    visible: s => !!s.completedProjects.bessemer,
+  },
+  {
+    id: 'electricity',
+    name: 'Electricity',
+    desc: 'Wire the cities. Factory output doubles again.',
+    cost: { output: 25000 },
+    era: 'industrial',
+    requires: s => s.era === 'industrial' && !!s.completedProjects.massProduction && (s.upgrades.factory ?? 0) >= 12,
+    requirementsText: 'Requires Mass Production, 12 factories',
+    apply: s => ({ flags: { ...s.flags, electricity: true } }),
+    visible: s => !!s.completedProjects.massProduction,
   },
   {
     id: 'apartmentBlocks',
@@ -214,6 +240,7 @@ export const projects: Project[] = [
     requires: s => !!s.completedProjects.electricity,
     requirementsText: 'Requires Electricity',
     apply: s => ({ flags: { ...s.flags, apartmentBlocks: true } }),
+    visible: s => !!s.completedProjects.electricity,
   },
   {
     id: 'telegraph',
@@ -230,6 +257,7 @@ export const projects: Project[] = [
     onComplete: () => {
       logEvent('The wires hum. Information now travels faster than thought.');
     },
+    visible: s => !!s.completedProjects.electricity && !!s.completedProjects.logistics,
   },
 ];
 

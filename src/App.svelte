@@ -3,7 +3,8 @@
   import { game, logEvent, buyMode, type BuyMode } from './game/game';
   import { agrarianUpgrades, buyUpgrade, nextAgrarianBulkCost, grainPerSec, grainConsumedPerSec, consumptionPerPop, grainCap, popCap, gatherGrain, currentHousingTier, dwellingMaxLevel, laborDemand, laborFraction } from './game/eras/agrarian';
   import { industrialUpgrades, buyIndustrialUpgrade, nextBulkCost, outputPerSec, grainDrainPerSec, outputCap, coalCap, coalPerSec, coalDrainPerSec } from './game/eras/industrial';
-  import { projects, projectAvailable, projectIncomplete, completeProject } from './game/projects';
+  import { projects, projectAvailable, projectIncomplete, projectVisible, completeProject, effectiveProjectCost } from './game/projects';
+  import { industrialUpgradeVisible } from './game/eras/industrial';
   import { startLoop, stopLoop } from './game/tick';
   import { hydrate, resetGame } from './game/save';
   import {
@@ -70,7 +71,8 @@
   $: grainConsumption = grainConsumedPerSec($game);
   $: grainNet = grainProduction - grainConsumption;
   $: perPop = consumptionPerPop($game);
-  $: visibleProjects = projects.filter(p => projectIncomplete(p, $game));
+  $: visibleProjects = projects.filter(p => projectVisible(p, $game));
+  $: visibleIndustrialUpgrades = industrialUpgrades.filter(u => industrialUpgradeVisible(u, $game));
   $: laborDemandVal = laborDemand($game);
   $: laborFractionVal = laborFraction($game);
   $: idleWorkers = Math.max(0, Math.floor(popAmt - laborDemandVal));
@@ -321,7 +323,7 @@
           <h2 class="sub">Industry</h2>
         </div>
         <div class="card-grid">
-          {#each industrialUpgrades as u}
+          {#each visibleIndustrialUpgrades as u}
             {@const lvl = $game.upgrades[u.id] ?? 0}
             {@const maxed = u.max !== undefined && lvl >= u.max}
             {@const bulk = nextBulkCost(u.id, $buyMode, $game)}
@@ -361,8 +363,9 @@
       {/if}
       {#each visibleProjects as p (p.id)}
         {@const unlocked = projectAvailable(p, $game)}
-        {@const grainOk = p.cost.grain === undefined || grainAmt >= p.cost.grain}
-        {@const outputOk = p.cost.output === undefined || outputAmt >= p.cost.output}
+        {@const eff = effectiveProjectCost(p)}
+        {@const grainOk = eff.grain === undefined || grainAmt >= eff.grain}
+        {@const outputOk = eff.output === undefined || outputAmt >= eff.output}
         {@const affordable = grainOk && outputOk}
         <button
           class="project"
@@ -377,8 +380,8 @@
           <div class="desc">{unlocked ? p.desc : p.requirementsText}</div>
           <div class="cost">
             {#if unlocked}
-              {p.cost.grain !== undefined ? `${fmt(p.cost.grain)} grain` : ''}
-              {p.cost.output !== undefined ? ` ${fmt(p.cost.output)} output` : ''}
+              {eff.grain !== undefined ? `${fmt(eff.grain)} grain` : ''}
+              {eff.output !== undefined ? ` ${fmt(eff.output)} output` : ''}
             {/if}
           </div>
         </button>
