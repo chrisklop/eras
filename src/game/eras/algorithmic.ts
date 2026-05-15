@@ -14,6 +14,7 @@ import { get } from 'svelte/store';
 import { game, spend, logEvent, type GameState } from '../game';
 import { bulkCost, affordableCount, laborFraction } from './agrarian';
 import { legacyProductionMultiplier } from '../legacy';
+import { returnBuffMultiplier } from '../offline';
 
 const RACK_BASE_COST = 50000;               // paid in insight
 const RACK_COST_GROWTH = 1.22;
@@ -133,7 +134,7 @@ export function computePerSec(s: GameState = get(game)): number {
   const openSrc = s.flags.openSource
     ? Math.max(0, (s.resources.pop ?? 0)) * 0.02
     : 0;
-  return (racks * RACK_COMPUTE_BASE * rackStaticMult(s) * labor + openSrc) * legacyProductionMultiplier();
+  return (racks * RACK_COMPUTE_BASE * rackStaticMult(s) * labor + openSrc) * legacyProductionMultiplier() * returnBuffMultiplier();
 }
 
 const ALGO_MULTS: Record<string, (s: GameState) => number> = {

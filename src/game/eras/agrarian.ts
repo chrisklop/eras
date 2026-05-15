@@ -2,6 +2,7 @@ import { get } from 'svelte/store';
 import { game, spend, logEvent, type GameState } from '../game';
 import { legacyPlowMultiplier, legacyGrainCapMultiplier, legacyPopGrowthBonus, legacyProductionMultiplier } from '../legacy';
 import { grainProdAchMult, popGrowthAchBonus } from '../achievements';
+import { returnBuffMultiplier } from '../offline';
 
 // =============================================================================
 // Cost & cap constants — single source of truth.
@@ -268,7 +269,7 @@ export function grainPerSec(s: GameState = get(game)): number {
   const surplus = Math.max(0, (s.resources.pop ?? 0) - laborDemand(s));
   const popBase = s.flags.writing ? WRITING_POP_OUTPUT : 0.05;
   const popOutput = surplus * popBase;
-  return (plowOutput + popOutput) * grainProdAchMult() * legacyProductionMultiplier();
+  return (plowOutput + popOutput) * grainProdAchMult() * legacyProductionMultiplier() * returnBuffMultiplier();
 }
 
 /**

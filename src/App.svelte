@@ -21,15 +21,24 @@
     hydrateLegacy,
   } from './game/legacy';
   import { achievements, ACHIEVEMENTS, hydrateAchievements } from './game/achievements';
+  import { applyOffline, returnBuffRemaining, returnBuffActive } from './game/offline';
 
   let showLegacy = false;
   let showAchievements = false;
+  let offlineReport: ReturnType<typeof applyOffline> = null;
+  let buffSecondsLeft = 0;
 
   onMount(() => {
     hydrateAchievements();
     hydrateLegacy();
     hydrate();
+    offlineReport = applyOffline();
     startLoop();
+    // Refresh buff countdown each second.
+    const id = setInterval(() => {
+      buffSecondsLeft = returnBuffRemaining();
+    }, 1000);
+    return () => clearInterval(id);
   });
   onDestroy(stopLoop);
 
@@ -295,6 +304,12 @@
         </div>
       {/if}
     </div>
+    {#if buffSecondsLeft > 0}
+      <div class="buff-chip" title="Return buff: ×2 production. Decays in real time.">
+        <span class="buff-label">×2 boost</span>
+        <span class="buff-val">{Math.floor(buffSecondsLeft / 60)}:{String(Math.floor(buffSecondsLeft % 60)).padStart(2, '0')}</span>
+      </div>
+    {/if}
     <button class="legacy-chip" on:click={() => (showAchievements = true)} title="Open Achievements panel">
       <span class="legacy-label">Achievements</span>
       <span class="legacy-val">{Object.keys($achievements.earned).length} / {ACHIEVEMENTS.length}</span>
@@ -367,6 +382,46 @@
             </div>
           {/each}
         </section>
+      </div>
+    </div>
+  {/if}
+
+  {#if offlineReport}
+    <div class="modal-backdrop" on:click={() => (offlineReport = null)}>
+      <div class="modal welcome-modal" on:click|stopPropagation>
+        <header class="modal-head">
+          <h2>Welcome back</h2>
+          <button class="close" on:click={() => (offlineReport = null)}>×</button>
+        </header>
+        <div class="legacy-summary">
+          <div class="dim small">Idle for</div>
+          <div><strong>{Math.floor(offlineReport.awaySec / 60)} min</strong></div>
+        </div>
+        {#if Object.keys(offlineReport.catchup).length > 0}
+          <section class="legacy-nodes">
+            <h3>Catch-up production (25% rate)</h3>
+            {#each Object.entries(offlineReport.catchup) as [k, v]}
+              <div class="node owned">
+                <div class="node-head">
+                  <strong>{k === 'output' ? 'goods' : k}</strong>
+                  <span class="node-cost">+{fmt(v as number)}</span>
+                </div>
+              </div>
+            {/each}
+          </section>
+        {/if}
+        {#if offlineReport.buffMs > 0}
+          <section class="legacy-nodes">
+            <h3>Return buff</h3>
+            <div class="node owned">
+              <div class="node-head">
+                <strong>×2 production</strong>
+                <span class="node-cost">5:00</span>
+              </div>
+              <div class="node-desc">All grain, goods, insight, and compute production doubled until the timer expires.</div>
+            </div>
+          </section>
+        {/if}
       </div>
     </div>
   {/if}
@@ -1112,6 +1167,22 @@
     color: var(--gilt, #d4a13a); opacity: 0.85;
     border: 1px solid var(--gilt, #d4a13a); padding: 0.05rem 0.4rem; border-radius: 2px;
   }
+
+  .buff-chip {
+    display: inline-flex; flex-direction: column; align-items: center;
+    padding: 0.4rem 0.9rem; margin-right: 0.6rem;
+    background: rgba(212, 161, 58, 0.15);
+    border: 1px solid var(--gilt, #d4a13a);
+    color: var(--gilt, #d4a13a); border-radius: 4px;
+    font-family: inherit;
+    animation: buffPulse 2s ease-in-out infinite;
+  }
+  @keyframes buffPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(212, 161, 58, 0.3); }
+    50% { box-shadow: 0 0 12px 0 rgba(212, 161, 58, 0.5); }
+  }
+  .buff-label { font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase; opacity: 0.85; }
+  .buff-val { font-family: var(--font-mono, monospace); font-size: 1.05rem; font-weight: 600; }
 
   .legacy-chip {
     display: inline-flex; flex-direction: column; align-items: center;

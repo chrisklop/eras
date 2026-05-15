@@ -13,6 +13,8 @@ export interface GameState {
   lastTick: number;
   peakPop?: number;
   peakOutput?: number;
+  /** Active return buff: production × mult until `until` (epoch ms). */
+  returnBuff?: { until: number; mult: number };
 }
 
 export const initialState: GameState = {
