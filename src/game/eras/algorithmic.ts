@@ -14,23 +14,23 @@ import { get } from 'svelte/store';
 import { game, spend, logEvent, type GameState } from '../game';
 import { bulkCost, affordableCount, laborFraction } from './agrarian';
 
-const RACK_BASE_COST = 100000;              // paid in insight
-const RACK_COST_GROWTH = 1.25;
-const RACK_INSIGHT_DRAIN = 40;
-const RACK_COMPUTE_BASE = 0.5;
+const RACK_BASE_COST = 50000;               // paid in insight
+const RACK_COST_GROWTH = 1.22;
+const RACK_INSIGHT_DRAIN = 30;
+const RACK_COMPUTE_BASE = 1.0;
 const OS_MULT = 1.8;
 const ML_MULT = 1.5;
 const CLOUD_MULT = 1.5;
 const LAB_PER_LEVEL = 1.15;
 
-const LAB_BASE_COST = 250000;               // paid in insight
-const LAB_COST_GROWTH = 1.18;
+const LAB_BASE_COST = 120000;               // paid in insight
+const LAB_COST_GROWTH = 1.16;
 
-const DATACENTER_BASE_COST = 80000;         // paid in insight
-const DATACENTER_COST_GROWTH = 1.15;
+const DATACENTER_BASE_COST = 40000;         // paid in insight
+const DATACENTER_COST_GROWTH = 1.13;
 
-const FIBER_BASE_COST = 60000;              // paid in compute
-const FIBER_COST_GROWTH = 1.2;
+const FIBER_BASE_COST = 25000;              // paid in compute
+const FIBER_COST_GROWTH = 1.18;
 const FIBER_MAX_PRE = 7;
 const FIBER_MAX_POST = 14;                  // after Broadband
 

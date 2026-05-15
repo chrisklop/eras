@@ -14,23 +14,28 @@ import { game, spend, logEvent, type GameState } from '../game';
 import { bulkCost, affordableCount, laborFraction } from './agrarian';
 import { insightProdAchMult } from '../achievements';
 
-const STATION_BASE_COST = 80000;            // paid in goods
-const STATION_COST_GROWTH = 1.25;
-const STATION_GOODS_DRAIN = 40;             // per second
-const STATION_INSIGHT_BASE = 0.5;
+const STATION_BASE_COST = 40000;            // paid in goods
+const STATION_COST_GROWTH = 1.22;
+const STATION_GOODS_DRAIN = 30;             // per second
+const STATION_INSIGHT_BASE = 1.0;
+// Population produces a baseline trickle of Insight from the moment you
+// enter the Information era — so Movable Type isn't gated behind your
+// first Station. Boosted by Public Education.
+const BASE_POP_INSIGHT = 0.005;
+const PUBLIC_EDUCATION_POP_INSIGHT = 0.05;
 const TELEGRAPH_NETWORK_MULT = 1.8;
 const MECHANICAL_COMPUTING_MULT = 1.5;
 const RADIO_MULT = 1.5;
 const PRESS_PER_LEVEL = 1.15;
 
-const PRESS_BASE_COST = 200000;             // paid in goods
-const PRESS_COST_GROWTH = 1.18;
+const PRESS_BASE_COST = 100000;             // paid in goods
+const PRESS_COST_GROWTH = 1.16;
 
-const ARCHIVE_BASE_COST = 60000;            // paid in goods
-const ARCHIVE_COST_GROWTH = 1.15;
+const ARCHIVE_BASE_COST = 30000;            // paid in goods
+const ARCHIVE_COST_GROWTH = 1.13;
 
-const WIRE_BASE_COST = 50000;               // paid in insight
-const WIRE_COST_GROWTH = 1.2;
+const WIRE_BASE_COST = 20000;               // paid in insight
+const WIRE_COST_GROWTH = 1.18;
 const WIRE_MAX_PRE = 7;
 const WIRE_MAX_POST = 14;                   // after Mass Communications
 
@@ -129,12 +134,14 @@ export function stationGoodsDrainPerSec(s: GameState = get(game)): number {
 }
 
 export function insightPerSec(s: GameState = get(game)): number {
+  // Only kicks in once Information era is reached.
+  if (s.era !== 'information' && s.era !== 'algorithmic' && s.era !== 'posthuman') return 0;
   const stations = s.upgrades.signalStation ?? 0;
   const labor = laborFraction(s);
-  const pubEd = s.flags.publicEducation
-    ? (Math.max(0, (s.resources.pop ?? 0) - laborInfoDemand(s))) * 0.05
-    : 0;
-  return (stations * STATION_INSIGHT_BASE * stationStaticMult(s) * labor + pubEd) * insightProdAchMult();
+  const pop = Math.max(0, (s.resources.pop ?? 0) - laborInfoDemand(s));
+  const popRate = s.flags.publicEducation ? PUBLIC_EDUCATION_POP_INSIGHT : BASE_POP_INSIGHT;
+  const popInsight = pop * popRate;
+  return (stations * STATION_INSIGHT_BASE * stationStaticMult(s) * labor + popInsight) * insightProdAchMult();
 }
 
 const INFORMATION_MULTS: Record<string, (s: GameState) => number> = {
@@ -214,23 +221,38 @@ export function nextInfoBulkCost(id: string, count: number | 'max', state?: Game
 export function tickInformation(dt: number) {
   const s = get(game);
   const stations = s.upgrades.signalStation ?? 0;
-
-  if (stations <= 0) return;
-
-  const goodsNeeded = stationGoodsDrainPerSec(s) * dt;
-  const goodsAvail = s.resources.output ?? 0;
-  const fraction = goodsNeeded > 0 ? Math.min(1, goodsAvail / goodsNeeded) : 1;
-  const goodsUsed = goodsNeeded * fraction;
-  const insightGained = insightPerSec(s) * dt * fraction;
   const cap = insightCap(s);
-  const newInsight = Math.min(cap, (s.resources.insight ?? 0) + insightGained);
 
+  // Station path: drain goods → produce station insight; pop trickle layered on top.
+  if (stations > 0) {
+    const goodsNeeded = stationGoodsDrainPerSec(s) * dt;
+    const goodsAvail = s.resources.output ?? 0;
+    const fraction = goodsNeeded > 0 ? Math.min(1, goodsAvail / goodsNeeded) : 1;
+    const goodsUsed = goodsNeeded * fraction;
+    // Station portion is rate-limited by fuel fraction; pop trickle is unaffected.
+    const pop = Math.max(0, (s.resources.pop ?? 0) - laborInfoDemand(s));
+    const popRate = s.flags.publicEducation ? PUBLIC_EDUCATION_POP_INSIGHT : BASE_POP_INSIGHT;
+    const labor = laborFraction(s);
+    const stationInsight = stations * STATION_INSIGHT_BASE * stationStaticMult(s) * labor * fraction;
+    const totalRate = (stationInsight + pop * popRate) * insightProdAchMult();
+    const newInsight = Math.min(cap, (s.resources.insight ?? 0) + totalRate * dt);
+    game.update(s2 => ({
+      ...s2,
+      resources: {
+        ...s2.resources,
+        output: Math.max(0, (s2.resources.output ?? 0) - goodsUsed),
+        insight: newInsight,
+      },
+    }));
+    return;
+  }
+
+  // No stations yet: just the pop trickle, no goods drain.
+  const rate = insightPerSec(s);
+  if (rate <= 0) return;
+  const newInsight = Math.min(cap, (s.resources.insight ?? 0) + rate * dt);
   game.update(s2 => ({
     ...s2,
-    resources: {
-      ...s2.resources,
-      output: Math.max(0, (s2.resources.output ?? 0) - goodsUsed),
-      insight: newInsight,
-    },
+    resources: { ...s2.resources, insight: newInsight },
   }));
 }
