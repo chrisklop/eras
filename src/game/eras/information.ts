@@ -13,6 +13,7 @@ import { get } from 'svelte/store';
 import { game, spend, logEvent, type GameState } from '../game';
 import { bulkCost, affordableCount, laborFraction } from './agrarian';
 import { insightProdAchMult } from '../achievements';
+import { legacyProductionMultiplier } from '../legacy';
 
 const STATION_BASE_COST = 40000;            // paid in goods
 const STATION_COST_GROWTH = 1.22;
@@ -43,7 +44,7 @@ const BASE_INSIGHT_CAP = 4000;
 const PRE_MOVABLE_TYPE_CAP_PER_ARCHIVE = 4000;
 const MOVABLE_TYPE_CAP_MULT = 1.5;
 
-const WORKERS_PER_STATION = 8;
+const WORKERS_PER_STATION = 100;
 
 export interface InformationUpgrade {
   id: string;
@@ -59,7 +60,7 @@ export const informationUpgrades: InformationUpgrade[] = [
   {
     id: 'signalStation',
     name: 'Signal Station',
-    desc: 'Burns Goods to produce Insight. Each needs 8 workers.',
+    desc: 'Burns Goods to produce Insight. Each needs 100 workers.',
     cost: (lvl) => ({ goods: Math.ceil(STATION_BASE_COST * Math.pow(STATION_COST_GROWTH, lvl)) }),
     effect: '+0.5 insight/sec',
   },
@@ -141,7 +142,7 @@ export function insightPerSec(s: GameState = get(game)): number {
   const pop = Math.max(0, (s.resources.pop ?? 0) - laborInfoDemand(s));
   const popRate = s.flags.publicEducation ? PUBLIC_EDUCATION_POP_INSIGHT : BASE_POP_INSIGHT;
   const popInsight = pop * popRate;
-  return (stations * STATION_INSIGHT_BASE * stationStaticMult(s) * labor + popInsight) * insightProdAchMult();
+  return (stations * STATION_INSIGHT_BASE * stationStaticMult(s) * labor + popInsight) * insightProdAchMult() * legacyProductionMultiplier();
 }
 
 const INFORMATION_MULTS: Record<string, (s: GameState) => number> = {

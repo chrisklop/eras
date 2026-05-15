@@ -40,13 +40,21 @@ export interface LegacyNode {
 }
 
 export const LEGACY_NODES: LegacyNode[] = [
-  { id: 'oralTradition',  name: 'Oral Tradition',   cost: 1,  desc: 'Begin each run with 12 grain instead of 0.' },
-  { id: 'ancestralTools', name: 'Ancestral Tools',  cost: 3,  desc: '+10% plow yield, applied multiplicatively.' },
-  { id: 'folkMemory',     name: 'Folk Memory',      cost: 6,  desc: '−10% on all project costs.' },
-  { id: 'stoneGranaries', name: 'Stone Granaries',  cost: 10, desc: '+50% base grain storage cap.' },
-  { id: 'bloodlines',     name: 'Bloodlines',       cost: 15, desc: '+0.1/sec base population growth.' },
-  { id: 'ironInheritance',name: 'Iron Inheritance', cost: 25, desc: 'Begin runs with Bronze Tools researched.', requires: 'ancestralTools' },
-  { id: 'sacredLibrary',  name: 'Sacred Library',   cost: 40, desc: 'Begin runs with Writing researched.',      requires: 'folkMemory' },
+  { id: 'oralTradition',  name: 'Oral Tradition',     cost: 1,   desc: 'Begin each run with 12 grain instead of 0.' },
+  { id: 'ancestralTools', name: 'Ancestral Tools',    cost: 3,   desc: '+10% plow yield, applied multiplicatively.' },
+  { id: 'folkMemory',     name: 'Folk Memory',        cost: 6,   desc: '−10% on all project costs.' },
+  { id: 'stoneGranaries', name: 'Stone Granaries',    cost: 10,  desc: '+50% base grain storage cap.' },
+  { id: 'bloodlines',     name: 'Bloodlines',         cost: 15,  desc: '+0.1/sec base population growth.' },
+  { id: 'ironInheritance',name: 'Iron Inheritance',   cost: 25,  desc: 'Begin runs with Bronze Tools researched.',     requires: 'ancestralTools' },
+  { id: 'sacredLibrary',  name: 'Sacred Library',     cost: 40,  desc: 'Begin runs with Writing researched.',          requires: 'folkMemory' },
+  { id: 'ancientPottery', name: 'Ancient Pottery',    cost: 60,  desc: 'Begin runs with Pottery researched (exponential grain storage).', requires: 'stoneGranaries' },
+  { id: 'longHarvest',    name: 'Long Harvest',       cost: 80,  desc: '+25% to all production rates (grain, goods, insight, compute).' },
+  { id: 'heritageOfSteel',name: 'Heritage of Steel',  cost: 120, desc: 'Begin runs with Crop Rotation researched.',    requires: 'ancientPottery' },
+  { id: 'lineageBuilders',name: 'Lineage of Builders',cost: 180, desc: '+1 free dwelling at the start of each run.' },
+  { id: 'eternalGranary', name: 'Eternal Granary',    cost: 250, desc: '+1 free granary at the start of each run.',    requires: 'heritageOfSteel' },
+  { id: 'remembered',     name: 'A People Remembered',cost: 350, desc: '+50% to all production rates (stacks with Long Harvest).', requires: 'longHarvest' },
+  { id: 'firstFire',      name: 'First Fire',         cost: 500, desc: 'Begin runs with The Industrial Revolution complete (skip to Steam & Steel).', requires: 'remembered' },
+  { id: 'wireNation',     name: 'A Wired Nation',     cost: 1000,desc: 'Begin runs with The Telegraph complete (skip to Wire & Signal).',           requires: 'firstFire' },
 ];
 
 export function legacyEarnedAt(peakPop: number, peakOutput: number): number {
@@ -89,20 +97,58 @@ export function legacyStartingState(): GameState {
   const l = get(legacy);
   const nodes = l.nodes;
   const flags: Record<string, boolean> = {};
-  if (nodes.ironInheritance) flags.bronzeTools = true;
-  if (nodes.sacredLibrary)   flags.writing     = true;
+  if (nodes.ironInheritance)  flags.bronzeTools = true;
+  if (nodes.sacredLibrary)    flags.writing     = true;
+  if (nodes.ancientPottery)   flags.pottery     = true;
+  if (nodes.heritageOfSteel)  flags.cropRotation = true;
+  const upgrades = { ...initialState.upgrades } as Record<string, number>;
+  if (nodes.lineageBuilders) upgrades.dwelling = Math.max(1, upgrades.dwelling ?? 0);
+  if (nodes.eternalGranary)  upgrades.granary  = Math.max(1, upgrades.granary  ?? 0);
+  let era: GameState['era'] = 'agrarian';
+  const completedProjects: Record<string, true> = {};
+  if (nodes.firstFire) {
+    era = 'industrial';
+    completedProjects.industrialRevolution = true;
+    completedProjects.bronzeTools = true;
+    completedProjects.writing = true;
+    completedProjects.compass = true;
+    flags.bronzeTools = true;
+    flags.writing = true;
+    flags.compass = true;
+  }
+  if (nodes.wireNation) {
+    era = 'information';
+    completedProjects.telegraph = true;
+    completedProjects.electricity = true;
+    completedProjects.logistics = true;
+    completedProjects.massProduction = true;
+    flags.electricity = true;
+    flags.logistics = true;
+    flags.massProduction = true;
+  }
   return {
     ...initialState,
+    era,
     resources: {
       ...initialState.resources,
       grain: nodes.oralTradition ? 12 : 0,
     },
+    upgrades,
     flags,
+    completedProjects,
     peakPop: 0,
     peakOutput: 0,
     startedAt: Date.now(),
     lastTick: Date.now(),
   };
+}
+
+/** Universal production multiplier from Long Harvest / Remembered nodes. */
+export function legacyProductionMultiplier(l: LegacyState = get(legacy)): number {
+  let m = 1;
+  if (l.nodes.longHarvest) m *= 1.25;
+  if (l.nodes.remembered)  m *= 1.5;
+  return m;
 }
 
 /** Production-time multipliers exposed to game systems. */

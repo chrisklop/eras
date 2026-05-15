@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { game, logEvent, buyMode, type BuyMode } from './game/game';
-  import { agrarianUpgrades, buyUpgrade, nextAgrarianBulkCost, grainPerSec, grainConsumedPerSec, consumptionPerPop, grainCap, popCap, gatherGrain, currentHousingTier, dwellingMaxLevel, laborDemand, laborFraction } from './game/eras/agrarian';
+  import { agrarianUpgrades, buyUpgrade, nextAgrarianBulkCost, grainPerSec, grainConsumedPerSec, consumptionPerPop, grainCap, popCap, gatherGrain, currentHousingTier, dwellingMaxLevel, laborDemand, laborFraction, PLOW_TIERS, GRANARY_TIERS, IRRIG_TIERS, tierByEra } from './game/eras/agrarian';
   import { industrialUpgrades, buyIndustrialUpgrade, nextBulkCost, outputPerSec, grainDrainPerSec, outputCap, coalCap, coalPerSec, coalDrainPerSec } from './game/eras/industrial';
   import { informationUpgrades, informationUpgradeVisible, buyInformationUpgrade, nextInfoBulkCost, insightPerSec, insightCap, stationGoodsDrainPerSec } from './game/eras/information';
   import { algorithmicUpgrades, algorithmicUpgradeVisible, buyAlgorithmicUpgrade, nextAlgoBulkCost, computePerSec, computeCap, rackInsightDrainPerSec } from './game/eras/algorithmic';
@@ -57,6 +57,58 @@
 
   function gather() {
     gatherGrain();
+  }
+
+  /** Format a duration as a compact ETA. Returns "—" for impossible (rate ≤ 0).
+   *  Examples: "12s", "4m 03s", "2h 14m", ">1d". */
+  function fmtEta(seconds: number): string {
+    if (!isFinite(seconds) || seconds < 0) return '—';
+    if (seconds < 1) return '<1s';
+    if (seconds < 60) return `${Math.ceil(seconds)}s`;
+    if (seconds < 3600) {
+      const m = Math.floor(seconds / 60);
+      const s = Math.floor(seconds % 60);
+      return s === 0 ? `${m}m` : `${m}m ${s.toString().padStart(2, '0')}s`;
+    }
+    if (seconds < 86400) {
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      return `${h}h ${m.toString().padStart(2, '0')}m`;
+    }
+    return '>1d';
+  }
+  /** Time until `have` becomes `target` given a net `rate` per second. */
+  function etaFor(have: number, target: number, rate: number): string {
+    if (have >= target) return 'ready';
+    if (rate <= 0) return '—';
+    return fmtEta((target - have) / rate);
+  }
+  /** Time until a resource reaches its cap. */
+  function etaToCap(have: number, cap: number, rate: number): string {
+    if (have >= cap - 0.5) return 'full';
+    if (rate <= 0) return '—';
+    return fmtEta((cap - have) / rate);
+  }
+
+  /** Live per-resource rates, used by ETA calculation on costs. */
+  $: rateOf = {
+    grain: grainProduction - grainConsumption,
+    goods: outputPerSec($game) - (($game.era === 'information' || $game.era === 'algorithmic') ? stationGoodsDrainPerSec($game) : 0),
+    insight: insightPerSec($game) - ($game.era === 'algorithmic' ? rackInsightDrainPerSec($game) : 0),
+    compute: computePerSec($game),
+    output: outputPerSec($game) - (($game.era === 'information' || $game.era === 'algorithmic') ? stationGoodsDrainPerSec($game) : 0),
+  } as Record<string, number>;
+  $: haveOf = {
+    grain: grainAmt, goods: outputAmt, output: outputAmt,
+    insight: insightAmt, compute: computeAmt,
+  } as Record<string, number>;
+  /** ETA for "need N of <res>" given current stockpile and net rate. */
+  function etaForRes(target: number, resKey: string): string {
+    const have = haveOf[resKey] ?? 0;
+    const rate = rateOf[resKey] ?? 0;
+    if (have >= target) return 'ready';
+    if (rate <= 0) return '—';
+    return fmtEta((target - have) / rate);
   }
 
   function fmt(n: number): string {
@@ -156,7 +208,7 @@
       </div>
     </div>
     <div class="resource-strip">
-      <div class="res">
+      <div class="res" title={grainNet > 0 ? `Full in ${etaToCap(grainAmt, cap, grainNet)}` : grainNet < 0 ? `Empty in ${fmtEta(grainAmt / -grainNet)}` : ''}>
         <span class="label">Grain</span>
         <span class="val" class:full={grainFull} class:starving={grainNet < 0 && grainAmt < 1}>
           {fmt(grainAmt)} / {fmt(cap)}
@@ -164,6 +216,11 @@
         <span class="rate" title={`Per citizen: ${perPop.toFixed(3)} grain/sec`}>
           +{fmt(grainProduction)} − {fmt(grainConsumption)} = {grainNet >= 0 ? '+' : ''}{fmt(grainNet)}/s
         </span>
+        {#if grainNet > 0 && grainAmt < cap}
+          <span class="eta">full in {etaToCap(grainAmt, cap, grainNet)}</span>
+        {:else if grainNet < 0 && grainAmt > 0}
+          <span class="eta starving">empty in {fmtEta(grainAmt / -grainNet)}</span>
+        {/if}
       </div>
       <div class="res">
         <span class="label">Population</span>
@@ -188,34 +245,53 @@
             <span class="rate">+{fmt(coalProd)} − {fmt(coalDrain)} = {coalProd - coalDrain >= 0 ? '+' : ''}{fmt(coalProd - coalDrain)}/s</span>
           </div>
         {/if}
+        {@const goodsDrain = ($game.era === 'information' || $game.era === 'algorithmic') ? stationGoodsDrainPerSec($game) : 0}
+        {@const goodsNet = outputPerSec($game) - goodsDrain}
+        {@const goodsCapVal = outputCap($game)}
         <div class="res">
           <span class="label">Goods</span>
-          <span class="val">{fmt(outputAmt)} / {fmt(outputCap($game))}</span>
-          {#if $game.era === 'information'}
-            {@const goodsDrain = stationGoodsDrainPerSec($game)}
-            <span class="rate">+{fmt(outputPerSec($game))} − {fmt(goodsDrain)} = {outputPerSec($game) - goodsDrain >= 0 ? '+' : ''}{fmt(outputPerSec($game) - goodsDrain)}/s</span>
+          <span class="val">{fmt(outputAmt)} / {fmt(goodsCapVal)}</span>
+          {#if goodsDrain > 0}
+            <span class="rate">+{fmt(outputPerSec($game))} − {fmt(goodsDrain)} = {goodsNet >= 0 ? '+' : ''}{fmt(goodsNet)}/s</span>
           {:else}
             <span class="rate">+{fmt(outputPerSec($game))}/s</span>
+          {/if}
+          {#if goodsNet > 0 && outputAmt < goodsCapVal}
+            <span class="eta">full in {etaToCap(outputAmt, goodsCapVal, goodsNet)}</span>
+          {:else if goodsNet < 0 && outputAmt > 0}
+            <span class="eta starving">empty in {fmtEta(outputAmt / -goodsNet)}</span>
           {/if}
         </div>
       {/if}
       {#if $game.era === 'information' || $game.era === 'algorithmic'}
+        {@const insDrain = $game.era === 'algorithmic' ? rackInsightDrainPerSec($game) : 0}
+        {@const insNet = insightPerSec($game) - insDrain}
+        {@const insCapVal = insightCap($game)}
         <div class="res">
           <span class="label">Insight</span>
-          <span class="val">{fmt(insightAmt)} / {fmt(insightCap($game))}</span>
-          {#if $game.era === 'algorithmic'}
-            {@const insDrain = rackInsightDrainPerSec($game)}
-            <span class="rate">+{fmt(insightPerSec($game))} − {fmt(insDrain)} = {insightPerSec($game) - insDrain >= 0 ? '+' : ''}{fmt(insightPerSec($game) - insDrain)}/s</span>
+          <span class="val">{fmt(insightAmt)} / {fmt(insCapVal)}</span>
+          {#if insDrain > 0}
+            <span class="rate">+{fmt(insightPerSec($game))} − {fmt(insDrain)} = {insNet >= 0 ? '+' : ''}{fmt(insNet)}/s</span>
           {:else}
             <span class="rate">+{fmt(insightPerSec($game))}/s</span>
+          {/if}
+          {#if insNet > 0 && insightAmt < insCapVal}
+            <span class="eta">full in {etaToCap(insightAmt, insCapVal, insNet)}</span>
+          {:else if insNet < 0 && insightAmt > 0}
+            <span class="eta starving">empty in {fmtEta(insightAmt / -insNet)}</span>
           {/if}
         </div>
       {/if}
       {#if $game.era === 'algorithmic'}
+        {@const cCapVal = computeCap($game)}
+        {@const cRate = computePerSec($game)}
         <div class="res">
           <span class="label">Compute</span>
-          <span class="val">{fmt(computeAmt)} / {fmt(computeCap($game))}</span>
-          <span class="rate">+{fmt(computePerSec($game))}/s</span>
+          <span class="val">{fmt(computeAmt)} / {fmt(cCapVal)}</span>
+          <span class="rate">+{fmt(cRate)}/s</span>
+          {#if cRate > 0 && computeAmt < cCapVal}
+            <span class="eta">full in {etaToCap(computeAmt, cCapVal, cRate)}</span>
+          {/if}
         </div>
       {/if}
     </div>
@@ -350,7 +426,7 @@
         </div>
       {/if}
       <div class="pane-head">
-        <h2>Upgrades</h2>
+        <h2>{$game.era === 'agrarian' ? 'Upgrades' : 'Agriculture'}</h2>
         <div class="mode">
           {#each buyModes as m}
             <button class:active={$buyMode === m} on:click={() => setMode(m)}>{m === 'max' ? 'Max' : `×${m}`}</button>
@@ -362,7 +438,17 @@
         {#each agrarianUpgrades as u}
           {@const lvl = $game.upgrades[u.id] ?? 0}
           {@const isDwelling = u.id === 'dwelling'}
-          {@const displayName = isDwelling ? currentHousingTier($game).name : u.name}
+          {@const tierName =
+            u.id === 'plow' ? tierByEra(PLOW_TIERS, $game.era).name :
+            u.id === 'granary' ? tierByEra(GRANARY_TIERS, $game.era).name :
+            u.id === 'irrigation' ? tierByEra(IRRIG_TIERS, $game.era).name :
+            null}
+          {@const tierDesc =
+            u.id === 'plow' ? tierByEra(PLOW_TIERS, $game.era).desc :
+            u.id === 'granary' ? tierByEra(GRANARY_TIERS, $game.era).desc :
+            u.id === 'irrigation' ? tierByEra(IRRIG_TIERS, $game.era).desc :
+            null}
+          {@const displayName = isDwelling ? currentHousingTier($game).name : (tierName ?? u.name)}
           {@const max = isDwelling ? dwellingMaxLevel($game) : u.max}
           {@const maxed = max !== undefined && lvl >= max}
           {@const bulk = nextAgrarianBulkCost(u.id, $buyMode, $game)}
@@ -380,13 +466,14 @@
             <div class="desc">
               {#if isDwelling}
                 Each holds {currentHousingTier($game).popPer}. Research next tier for more density.
-              {:else}{u.desc}{/if}
+              {:else}{tierDesc ?? u.desc}{/if}
             </div>
             <div class="cost">
               {#if maxed}maxed — research next tier
               {:else if bulk.n === 0}—
               {:else}
                 buy {bulk.n} · {fmt(bulk.total)} grain
+                {#if !buyable}<span class="eta-inline">· in {etaForRes(bulk.total, 'grain')}</span>{/if}
               {/if}
             </div>
           </button>
@@ -420,6 +507,7 @@
                 {:else if bulk.n === 0}—
                 {:else}
                   buy {bulk.n} · {fmt(bulk.total)} {bulk.res}
+                  {#if !buyable}<span class="eta-inline">· in {etaForRes(bulk.total, bulk.res)}</span>{/if}
                 {/if}
               </div>
             </button>
@@ -455,6 +543,7 @@
                 {:else if bulk.n === 0}—
                 {:else}
                   buy {bulk.n} · {fmt(bulk.total)} {bulk.res}
+                  {#if !buyable}<span class="eta-inline">· in {etaForRes(bulk.total, bulk.res)}</span>{/if}
                 {/if}
               </div>
             </button>
@@ -490,6 +579,7 @@
                 {:else if bulk.n === 0}—
                 {:else}
                   buy {bulk.n} · {fmt(bulk.total)} {bulk.res}
+                  {#if !buyable}<span class="eta-inline">· in {etaForRes(bulk.total, bulk.res)}</span>{/if}
                 {/if}
               </div>
             </button>
@@ -531,6 +621,11 @@
               {eff.output !== undefined ? ` ${fmt(eff.output)} goods` : ''}
               {eff.insight !== undefined ? ` ${fmt(eff.insight)} insight` : ''}
               {eff.compute !== undefined ? ` ${fmt(eff.compute)} compute` : ''}
+              {#if !affordable}
+                {@const blockingRes = !grainOk ? 'grain' : !outputOk ? 'output' : !insightOk ? 'insight' : 'compute'}
+                {@const blockingCost = eff[blockingRes] ?? 0}
+                <span class="eta-inline">· in {etaForRes(blockingCost, blockingRes)}</span>
+              {/if}
             {/if}
           </div>
         </button>
@@ -548,7 +643,8 @@
             {@const grainOk = eff.grain === undefined || grainAmt >= eff.grain}
             {@const outputOk = eff.output === undefined || outputAmt >= eff.output}
             {@const insightOk = eff.insight === undefined || insightAmt >= eff.insight}
-            {@const affordable = grainOk && outputOk && insightOk}
+            {@const computeOk = eff.compute === undefined || computeAmt >= eff.compute}
+            {@const affordable = grainOk && outputOk && insightOk && computeOk}
             <button
               class="project wonder"
               class:locked={!unlocked}
@@ -565,6 +661,12 @@
                   {eff.grain !== undefined ? `${fmt(eff.grain)} grain` : ''}
                   {eff.output !== undefined ? ` ${fmt(eff.output)} goods` : ''}
                   {eff.insight !== undefined ? ` ${fmt(eff.insight)} insight` : ''}
+                  {eff.compute !== undefined ? ` ${fmt(eff.compute)} compute` : ''}
+                  {#if !affordable}
+                    {@const blockingRes = !grainOk ? 'grain' : !outputOk ? 'output' : !insightOk ? 'insight' : 'compute'}
+                    {@const blockingCost = eff[blockingRes] ?? 0}
+                    <span class="eta-inline">· in {etaForRes(blockingCost, blockingRes)}</span>
+                  {/if}
                 {/if}
               </div>
             </button>
@@ -988,6 +1090,10 @@
     text-transform: uppercase; opacity: 0.65; margin-top: 0.25rem;
     font-family: var(--font-mono, monospace);
   }
+
+  .eta { font-size: 0.62rem; opacity: 0.55; letter-spacing: 0.06em; text-transform: uppercase; display: block; margin-top: 0.15rem; }
+  .eta.starving { color: var(--ember, #c5583a); opacity: 0.9; }
+  .eta-inline { font-size: 0.78rem; opacity: 0.6; margin-left: 0.4rem; }
 
   .wonders-head h2 { color: var(--gilt, #d4a13a); }
   .project.wonder {

@@ -1,6 +1,6 @@
 import { get } from 'svelte/store';
 import { game, spend, logEvent, type GameState } from '../game';
-import { legacyPlowMultiplier, legacyGrainCapMultiplier, legacyPopGrowthBonus } from '../legacy';
+import { legacyPlowMultiplier, legacyGrainCapMultiplier, legacyPopGrowthBonus, legacyProductionMultiplier } from '../legacy';
 import { grainProdAchMult, popGrowthAchBonus } from '../achievements';
 
 // =============================================================================
@@ -39,6 +39,45 @@ const BASE_POP_CAP = 5;
 const BASE_POP_GROWTH = 0.3;
 
 // Housing tiers — each project flag overrides the lower tier.
+// Era-themed names for the foundational agrarian buildings. They keep
+// producing the same grain/storage/water/labor mechanics throughout the
+// game, but the flavor escalates with the player's tech level.
+export const PLOW_TIERS = [
+  { era: 'algorithmic' as const, name: 'Vertical Farm',     desc: 'Stacked hydroponics under LEDs.' },
+  { era: 'information' as const, name: 'Industrial Farm',   desc: 'Combines, fertilizer, monoculture.' },
+  { era: 'industrial'  as const, name: 'Mechanized Plow',   desc: 'Steel-bladed, ox-team, broad furrows.' },
+  { era: 'agrarian'    as const, name: 'Wooden Plow',       desc: 'Auto-gather grain. Cost scales with current plow efficiency.' },
+];
+export const GRANARY_TIERS = [
+  { era: 'algorithmic' as const, name: 'Smart Silo',        desc: 'Sensor-monitored, pest-sealed grain bank.' },
+  { era: 'information' as const, name: 'Grain Elevator',    desc: 'Rail-fed concrete tower for bulk storage.' },
+  { era: 'industrial'  as const, name: 'Warehouse Granary', desc: 'Brick-lined, ventilated, foreman-managed.' },
+  { era: 'agrarian'    as const, name: 'Granary',           desc: 'Stores grain. Pre-Pottery: +50 cap. Post-Pottery: ×1.5 cap each.' },
+];
+export const IRRIG_TIERS = [
+  { era: 'algorithmic' as const, name: 'Drip System',       desc: 'Per-plant moisture sensors.' },
+  { era: 'information' as const, name: 'Pivot Irrigation',  desc: 'Center-pivot sprinklers across the plains.' },
+  { era: 'industrial'  as const, name: 'Reservoir Ditch',   desc: 'Steam-pumped from new reservoirs.' },
+  { era: 'agrarian'    as const, name: 'Irrigation Ditch',  desc: 'Each level boosts plow yield by 30%.' },
+];
+
+export function tierByEra<T extends { era: 'agrarian' | 'industrial' | 'information' | 'algorithmic' }>(
+  tiers: T[],
+  era: string,
+): T {
+  for (const t of tiers) {
+    if (era === t.era) return t;
+    if (era === 'posthuman' || era === 'cosmic') return tiers[0]; // future-proof
+  }
+  // Fall through by era order: algorithmic > information > industrial > agrarian
+  const order = ['algorithmic', 'information', 'industrial', 'agrarian'];
+  for (const e of order.slice(order.indexOf(era))) {
+    const t = tiers.find(x => x.era === e);
+    if (t) return t;
+  }
+  return tiers[tiers.length - 1];
+}
+
 export const HOUSING_TIERS = [
   { flag: 'apartmentBlocks', name: 'Apartment Block', popPer: 150, maxDwellings: 120 },
   { flag: 'tenements',       name: 'Tenement',         popPer: 60,  maxDwellings: 80 },
@@ -144,11 +183,14 @@ export function popGrowthPerSec(s: GameState = get(game)): number {
 }
 
 // Labor demand — every building needs workers from population.
+// Later-era buildings scale up worker demand so population stays a real
+// economic constraint. With 10K pop you can run ~20 racks comfortably; growing
+// past that requires growing pop too.
 const WORKERS_PER_PLOW = 1;
-const WORKERS_PER_MINE = 2;
-const WORKERS_PER_FACTORY = 5;
-const WORKERS_PER_STATION = 8;
-const WORKERS_PER_RACK = 12;
+const WORKERS_PER_MINE = 3;
+const WORKERS_PER_FACTORY = 25;
+const WORKERS_PER_STATION = 100;
+const WORKERS_PER_RACK = 500;
 
 export function laborDemand(s: GameState = get(game)): number {
   return (
@@ -216,7 +258,7 @@ export function grainPerSec(s: GameState = get(game)): number {
   const surplus = Math.max(0, (s.resources.pop ?? 0) - laborDemand(s));
   const popBase = s.flags.writing ? WRITING_POP_OUTPUT : 0.05;
   const popOutput = surplus * popBase;
-  return (plowOutput + popOutput) * grainProdAchMult();
+  return (plowOutput + popOutput) * grainProdAchMult() * legacyProductionMultiplier();
 }
 
 /**

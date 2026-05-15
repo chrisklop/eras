@@ -13,6 +13,7 @@
 import { get } from 'svelte/store';
 import { game, spend, logEvent, type GameState } from '../game';
 import { bulkCost, affordableCount, laborFraction } from './agrarian';
+import { legacyProductionMultiplier } from '../legacy';
 
 const RACK_BASE_COST = 50000;               // paid in insight
 const RACK_COST_GROWTH = 1.22;
@@ -52,7 +53,7 @@ export const algorithmicUpgrades: AlgorithmicUpgrade[] = [
   {
     id: 'serverRack',
     name: 'Server Rack',
-    desc: 'Burns Insight into Compute cycles. Each needs 12 workers.',
+    desc: 'Burns Insight into Compute cycles. Each needs 500 workers.',
     cost: (lvl) => ({ insight: Math.ceil(RACK_BASE_COST * Math.pow(RACK_COST_GROWTH, lvl)) }),
     effect: '+0.5 compute/sec',
   },
@@ -114,7 +115,7 @@ export function rackStaticMult(s: GameState = get(game)): number {
   return Math.pow(LAB_PER_LEVEL, labs) * rackCostMult(s) * wonderMult;
 }
 
-const WORKERS_PER_RACK = 12;
+const WORKERS_PER_RACK = 500;
 export function laborAlgoDemand(s: GameState = get(game)): number {
   return (s.upgrades.serverRack ?? 0) * WORKERS_PER_RACK;
 }
@@ -132,7 +133,7 @@ export function computePerSec(s: GameState = get(game)): number {
   const openSrc = s.flags.openSource
     ? Math.max(0, (s.resources.pop ?? 0)) * 0.02
     : 0;
-  return racks * RACK_COMPUTE_BASE * rackStaticMult(s) * labor + openSrc;
+  return (racks * RACK_COMPUTE_BASE * rackStaticMult(s) * labor + openSrc) * legacyProductionMultiplier();
 }
 
 const ALGO_MULTS: Record<string, (s: GameState) => number> = {
