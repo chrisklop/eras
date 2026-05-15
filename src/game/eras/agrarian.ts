@@ -36,7 +36,7 @@ const PRE_POTTERY_CAP_PER_GRANARY = 50;
 const POTTERY_CAP_MULT = 1.5;
 
 const BASE_POP_CAP = 5;
-const BASE_POP_GROWTH = 0.3;
+const BASE_POP_GROWTH = 0.15;
 
 // Housing tiers — each project flag overrides the lower tier.
 // Era-themed names for the foundational agrarian buildings. They keep
@@ -79,11 +79,11 @@ export function tierByEra<T extends { era: 'agrarian' | 'industrial' | 'informat
 }
 
 export const HOUSING_TIERS = [
-  { flag: 'apartmentBlocks', name: 'Apartment Block', popPer: 150, maxDwellings: 120 },
-  { flag: 'tenements',       name: 'Tenement',         popPer: 60,  maxDwellings: 80 },
-  { flag: 'cityPlanning',    name: 'Insula',           popPer: 25,  maxDwellings: 50 },
-  { flag: 'masonry',         name: 'Brick House',      popPer: 12,  maxDwellings: 30 },
-  { flag: null,              name: 'Hut',              popPer: 5,   maxDwellings: 15 },
+  { flag: 'apartmentBlocks', name: 'Apartment Block', popPer: 60, maxDwellings: 80 },
+  { flag: 'tenements',       name: 'Tenement',         popPer: 30, maxDwellings: 60 },
+  { flag: 'cityPlanning',    name: 'Insula',           popPer: 15, maxDwellings: 40 },
+  { flag: 'masonry',         name: 'Brick House',      popPer: 8,  maxDwellings: 25 },
+  { flag: null,              name: 'Hut',              popPer: 4,  maxDwellings: 15 },
 ] as const;
 
 export function currentHousingTier(s: GameState = get(game)) {
@@ -92,8 +92,8 @@ export function currentHousingTier(s: GameState = get(game)) {
   }
   return HOUSING_TIERS[HOUSING_TIERS.length - 1];
 }
-const POP_GROWTH_PER_DWELLING = 0.1;
-const MAX_POP_GROWTH = 3;
+const POP_GROWTH_PER_DWELLING = 0.08;
+const MAX_POP_GROWTH = 2;
 
 // Food consumption — base 0.3 grain/sec per citizen, multiplicatively reduced
 // by efficiency techs. See popConsumptionPerSec().
@@ -177,9 +177,19 @@ export function dwellingMaxLevel(s: GameState = get(game)): number {
 
 export function popGrowthPerSec(s: GameState = get(game)): number {
   const dwellings = s.upgrades.dwelling ?? 0;
-  const compassBoost = s.flags.compass ? 0.5 : 0;
-  const wonderBoost = s.flags.stonehenge ? 0.5 : 0;
-  return Math.min(MAX_POP_GROWTH, BASE_POP_GROWTH + POP_GROWTH_PER_DWELLING * dwellings + compassBoost + legacyPopGrowthBonus() + wonderBoost + popGrowthAchBonus());
+  const compassBoost = s.flags.compass ? 0.2 : 0;
+  const wonderBoost = s.flags.stonehenge ? 0.2 : 0;
+  const raw = BASE_POP_GROWTH + POP_GROWTH_PER_DWELLING * dwellings + compassBoost
+            + legacyPopGrowthBonus() + wonderBoost + popGrowthAchBonus();
+  const capped = Math.min(MAX_POP_GROWTH, raw);
+  // Logistic taper: growth halves at 50% pop/cap, near-zero at 95%+.
+  // This makes pop a real commodity — it doesn't auto-fill housing.
+  const pop = s.resources.pop ?? 0;
+  const cap = popCap(s);
+  if (cap <= 0) return 0;
+  const headroom = Math.max(0, 1 - pop / cap);
+  // Gentle taper near cap (linear-ish); steep slowdown only past 75% full.
+  return capped * Math.pow(headroom, 0.8);
 }
 
 // Labor demand — every building needs workers from population.
@@ -188,9 +198,9 @@ export function popGrowthPerSec(s: GameState = get(game)): number {
 // past that requires growing pop too.
 const WORKERS_PER_PLOW = 1;
 const WORKERS_PER_MINE = 3;
-const WORKERS_PER_FACTORY = 25;
-const WORKERS_PER_STATION = 100;
-const WORKERS_PER_RACK = 500;
+const WORKERS_PER_FACTORY = 20;
+const WORKERS_PER_STATION = 80;
+const WORKERS_PER_RACK = 300;
 
 export function laborDemand(s: GameState = get(game)): number {
   return (

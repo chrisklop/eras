@@ -44,7 +44,7 @@ const BASE_INSIGHT_CAP = 4000;
 const PRE_MOVABLE_TYPE_CAP_PER_ARCHIVE = 4000;
 const MOVABLE_TYPE_CAP_MULT = 1.5;
 
-const WORKERS_PER_STATION = 100;
+const WORKERS_PER_STATION = 80;
 
 export interface InformationUpgrade {
   id: string;
@@ -60,7 +60,7 @@ export const informationUpgrades: InformationUpgrade[] = [
   {
     id: 'signalStation',
     name: 'Signal Station',
-    desc: 'Burns Goods to produce Insight. Each needs 100 workers.',
+    desc: 'Burns Goods to produce Insight. Each needs 80 workers.',
     cost: (lvl) => ({ goods: Math.ceil(STATION_BASE_COST * Math.pow(STATION_COST_GROWTH, lvl)) }),
     effect: '+0.5 insight/sec',
   },
