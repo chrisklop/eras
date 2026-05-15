@@ -3,6 +3,7 @@ import { game } from './game';
 import { tickAgrarian } from './eras/agrarian';
 import { tickIndustrial } from './eras/industrial';
 import { tickInformation } from './eras/information';
+import { tickAlgorithmic } from './eras/algorithmic';
 import { saveState } from './save';
 import { checkAchievements } from './achievements';
 
@@ -25,8 +26,11 @@ export function startLoop() {
     if (s.era === 'industrial' || s.era === 'information' || s.era === 'algorithmic') {
       tickIndustrial(dt);
     }
-    if (s.era === 'information' || s.era === 'algorithmic') {
+    if (s.era === 'information' || s.era === 'algorithmic' || s.era === 'posthuman') {
       tickInformation(dt);
+    }
+    if (s.era === 'algorithmic' || s.era === 'posthuman') {
+      tickAlgorithmic(dt);
     }
 
     // Track peaks for legacy calculation.

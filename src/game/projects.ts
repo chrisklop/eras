@@ -6,7 +6,7 @@ export interface Project {
   id: string;
   name: string;
   desc: string;
-  cost: { grain?: number; output?: number; insight?: number };
+  cost: { grain?: number; output?: number; insight?: number; compute?: number };
   era: EraId | 'any';
   requires: (s: GameState) => boolean;
   requirementsText: string;
@@ -349,6 +349,93 @@ export const projects: Project[] = [
     visible: s => !!s.completedProjects.radio,
   },
 
+  // ============================== Algorithmic era ==============================
+
+  {
+    id: 'compiler',
+    name: 'Compiler',
+    desc: 'High-level languages, machine code. Data Centers now multiply Compute storage by ×1.5 each. Paradigm shift.',
+    cost: { compute: 800 },
+    era: 'algorithmic',
+    requires: s => s.era === 'algorithmic' && (s.upgrades.dataCenter ?? 0) >= 1,
+    requirementsText: 'Requires 1 data center',
+    apply: s => ({ flags: { ...s.flags, compiler: true } }),
+    visible: s => s.era === 'algorithmic' && (s.upgrades.serverRack ?? 0) >= 1,
+  },
+  {
+    id: 'operatingSystem',
+    name: 'Operating System',
+    desc: 'Kernel, scheduler, file system. Server Racks produce 1.8× Compute.',
+    cost: { compute: 2500 },
+    era: 'algorithmic',
+    requires: s => s.era === 'algorithmic' && (s.upgrades.serverRack ?? 0) >= 2,
+    requirementsText: 'Requires 2 server racks',
+    apply: s => ({ flags: { ...s.flags, operatingSystem: true } }),
+    visible: s => s.era === 'algorithmic' && (s.upgrades.serverRack ?? 0) >= 1,
+  },
+  {
+    id: 'openSource',
+    name: 'Open Source',
+    desc: 'Volunteer contribution at scale. Population produces 0.02 Compute/sec each.',
+    cost: { compute: 10000 },
+    era: 'algorithmic',
+    requires: s => s.era === 'algorithmic' && !!s.completedProjects.operatingSystem && (s.resources.pop ?? 0) >= 1500,
+    requirementsText: 'Requires Operating System, 1500 pop',
+    apply: s => ({ flags: { ...s.flags, openSource: true } }),
+    visible: s => !!s.completedProjects.operatingSystem,
+  },
+  {
+    id: 'machineLearning',
+    name: 'Machine Learning',
+    desc: 'Gradient descent on everything. Server Racks produce 1.5× Compute.',
+    cost: { compute: 30000 },
+    era: 'algorithmic',
+    requires: s => s.era === 'algorithmic' && !!s.completedProjects.operatingSystem && (s.upgrades.serverRack ?? 0) >= 4,
+    requirementsText: 'Requires Operating System, 4 racks',
+    apply: s => ({ flags: { ...s.flags, machineLearning: true } }),
+    visible: s => !!s.completedProjects.operatingSystem,
+  },
+  {
+    id: 'broadband',
+    name: 'Broadband',
+    desc: 'Always-on, gigabit pipes. Fiber Optics expand to a max of 14 levels.',
+    cost: { compute: 18000 },
+    era: 'algorithmic',
+    requires: s => s.era === 'algorithmic' && (s.upgrades.fiberOptic ?? 0) >= 5,
+    requirementsText: 'Requires 5 fiber optics',
+    apply: s => ({ flags: { ...s.flags, broadband: true } }),
+    visible: s => s.era === 'algorithmic' && (s.upgrades.fiberOptic ?? 0) >= 3,
+  },
+  {
+    id: 'cloudComputing',
+    name: 'Cloud Computing',
+    desc: 'Elastic everything, billed by the second. Racks produce another 1.5× Compute.',
+    cost: { compute: 80000 },
+    era: 'algorithmic',
+    requires: s => s.era === 'algorithmic' && !!s.completedProjects.machineLearning && (s.upgrades.serverRack ?? 0) >= 8,
+    requirementsText: 'Requires Machine Learning, 8 racks',
+    apply: s => ({ flags: { ...s.flags, cloudComputing: true } }),
+    visible: s => !!s.completedProjects.machineLearning,
+  },
+  {
+    id: 'aiBreakthrough',
+    name: 'AI Breakthrough',
+    desc: 'Cognition without flesh. Begin the next era.',
+    cost: { compute: 500000 },
+    era: 'algorithmic',
+    requires: s =>
+      s.era === 'algorithmic' &&
+      !!s.completedProjects.cloudComputing &&
+      !!s.completedProjects.openSource &&
+      (s.upgrades.serverRack ?? 0) >= 12,
+    requirementsText: 'Requires Cloud Computing, Open Source, 12 racks',
+    apply: _s => ({ era: 'posthuman' as EraId }),
+    onComplete: () => {
+      logEvent('Minds outside the body. The post-human age begins.');
+    },
+    visible: s => !!s.completedProjects.cloudComputing,
+  },
+
   // ============================== Wonders ==============================
 
   // Agrarian wonders
@@ -462,6 +549,44 @@ export const projects: Project[] = [
     requirementsText: 'Requires Mechanical Computing',
     apply: s => ({ flags: { ...s.flags, hooverDam: true } }),
     visible: s => !!s.completedProjects.mechanicalComputing,
+    wonder: true,
+  },
+
+  // Algorithmic wonders
+  {
+    id: 'internetBackbone',
+    name: 'Internet Backbone',
+    desc: 'Submarine cables circling the globe. ×1.5 Compute storage.',
+    cost: { compute: 5000 },
+    era: 'algorithmic',
+    requires: s => s.era === 'algorithmic' && !!s.completedProjects.operatingSystem,
+    requirementsText: 'Requires Operating System',
+    apply: s => ({ flags: { ...s.flags, internetBackbone: true } }),
+    visible: s => !!s.completedProjects.operatingSystem,
+    wonder: true,
+  },
+  {
+    id: 'quantumLab',
+    name: 'Quantum Lab',
+    desc: 'Dilution refrigerators, qubits, superposition. Server Racks produce +25% Compute.',
+    cost: { compute: 50000 },
+    era: 'algorithmic',
+    requires: s => s.era === 'algorithmic' && !!s.completedProjects.machineLearning,
+    requirementsText: 'Requires Machine Learning',
+    apply: s => ({ flags: { ...s.flags, quantumLab: true } }),
+    visible: s => !!s.completedProjects.machineLearning,
+    wonder: true,
+  },
+  {
+    id: 'renewableGrid',
+    name: 'Renewable Grid',
+    desc: 'Sun, wind, tide. Server Rack Insight drain halved.',
+    cost: { compute: 180000 },
+    era: 'algorithmic',
+    requires: s => s.era === 'algorithmic' && !!s.completedProjects.cloudComputing,
+    requirementsText: 'Requires Cloud Computing',
+    apply: s => ({ flags: { ...s.flags, renewableGrid: true } }),
+    visible: s => !!s.completedProjects.cloudComputing,
     wonder: true,
   },
 ];

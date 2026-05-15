@@ -10,6 +10,7 @@
 import { agrarianUpgrades, grainCap, popCap, popGrowthPerSec, grainPerSec, grainConsumedPerSec } from '../src/game/eras/agrarian';
 import { industrialUpgrades, outputCap, outputPerSec, grainDrainPerSec, coalCap, coalPerSec, coalDrainPerSec } from '../src/game/eras/industrial';
 import { informationUpgrades, insightCap, insightPerSec, stationGoodsDrainPerSec } from '../src/game/eras/information';
+import { algorithmicUpgrades, computeCap, computePerSec, rackInsightDrainPerSec } from '../src/game/eras/algorithmic';
 import { projects, projectAvailable, canAffordProject } from '../src/game/projects';
 import { initialState, type GameState } from '../src/game/game';
 
@@ -79,6 +80,19 @@ function tick(s: GameState, dt: number) {
       s.resources.output = Math.max(0, goodsAvail - goodsNeeded * f);
       const iCap = insightCap(s);
       s.resources.insight = Math.min(iCap, (s.resources.insight ?? 0) + insightPerSec(s) * dt * f);
+    }
+  }
+
+  // Algorithmic: server racks drain insight → produce compute
+  if (s.era === 'algorithmic') {
+    const racks = s.upgrades.serverRack ?? 0;
+    if (racks > 0) {
+      const insNeeded = rackInsightDrainPerSec(s) * dt;
+      const insAvail = s.resources.insight ?? 0;
+      const f = insNeeded > 0 ? Math.min(1, insAvail / insNeeded) : 1;
+      s.resources.insight = Math.max(0, insAvail - insNeeded * f);
+      const cCap = computeCap(s);
+      s.resources.compute = Math.min(cCap, (s.resources.compute ?? 0) + computePerSec(s) * dt * f);
     }
   }
   s.resources.grain = Math.max(0, Math.min(cap, (s.resources.grain ?? 0) + grainDelta));
@@ -163,7 +177,7 @@ function simulate(): { phases: PhaseLog[]; violations: string[]; reachedIR: bool
       applyProject(s, p.id);
       logPhase(`project: ${p.name}`);
       lastPurchaseTime = t;
-      if (p.id === 'theInternet') {
+      if (p.id === 'aiBreakthrough') {
         return { phases, violations, reachedIR: true, finalState: s, elapsed: t };
       }
       continue;
@@ -224,6 +238,9 @@ function simulate(): { phases: PhaseLog[]; violations: string[]; reachedIR: bool
     }
     if (s.era === 'information' || s.era === 'algorithmic') {
       considerSet(informationUpgrades as any, 'information');
+    }
+    if (s.era === 'algorithmic') {
+      considerSet(algorithmicUpgrades as any, 'information');
     }
 
     if (bestUpgrade) {

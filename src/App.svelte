@@ -4,6 +4,7 @@
   import { agrarianUpgrades, buyUpgrade, nextAgrarianBulkCost, grainPerSec, grainConsumedPerSec, consumptionPerPop, grainCap, popCap, gatherGrain, currentHousingTier, dwellingMaxLevel, laborDemand, laborFraction } from './game/eras/agrarian';
   import { industrialUpgrades, buyIndustrialUpgrade, nextBulkCost, outputPerSec, grainDrainPerSec, outputCap, coalCap, coalPerSec, coalDrainPerSec } from './game/eras/industrial';
   import { informationUpgrades, informationUpgradeVisible, buyInformationUpgrade, nextInfoBulkCost, insightPerSec, insightCap, stationGoodsDrainPerSec } from './game/eras/information';
+  import { algorithmicUpgrades, algorithmicUpgradeVisible, buyAlgorithmicUpgrade, nextAlgoBulkCost, computePerSec, computeCap, rackInsightDrainPerSec } from './game/eras/algorithmic';
   import { projects, projectAvailable, projectIncomplete, projectVisible, completeProject, effectiveProjectCost } from './game/projects';
   import { industrialUpgradeVisible } from './game/eras/industrial';
   import { startLoop, stopLoop } from './game/tick';
@@ -80,7 +81,9 @@
   $: builtWonders = projects.filter(p => p.wonder && $game.completedProjects[p.id]);
   $: visibleIndustrialUpgrades = industrialUpgrades.filter(u => industrialUpgradeVisible(u, $game));
   $: visibleInformationUpgrades = informationUpgrades.filter(u => informationUpgradeVisible(u, $game));
+  $: visibleAlgorithmicUpgrades = algorithmicUpgrades.filter(u => algorithmicUpgradeVisible(u, $game));
   $: insightAmt = $game.resources.insight ?? 0;
+  $: computeAmt = $game.resources.compute ?? 0;
   $: laborDemandVal = laborDemand($game);
   $: laborFractionVal = laborFraction($game);
   $: idleWorkers = Math.max(0, Math.floor(popAmt - laborDemandVal));
@@ -99,9 +102,9 @@
 
   /** Find the nearest locked project for a given era — the "horizon". */
   function projectCostScalar(p: typeof projects[number]): number {
-    return p.cost.grain ?? p.cost.output ?? p.cost.insight ?? 0;
+    return p.cost.grain ?? p.cost.output ?? p.cost.insight ?? p.cost.compute ?? 0;
   }
-  function nextHorizon(era: 'agrarian' | 'industrial' | 'information') {
+  function nextHorizon(era: 'agrarian' | 'industrial' | 'information' | 'algorithmic') {
     const locked = projects.filter(p =>
       projectIncomplete(p, $game) &&
       !projectAvailable(p, $game) &&
@@ -119,6 +122,7 @@
   }
 
   $: upgradesHorizon = nextHorizon(
+    $game.era === 'algorithmic' ? 'algorithmic' :
     $game.era === 'information' ? 'information' :
     $game.era === 'industrial' ? 'industrial' : 'agrarian'
   );
@@ -195,11 +199,23 @@
           {/if}
         </div>
       {/if}
-      {#if $game.era === 'information'}
+      {#if $game.era === 'information' || $game.era === 'algorithmic'}
         <div class="res">
           <span class="label">Insight</span>
           <span class="val">{fmt(insightAmt)} / {fmt(insightCap($game))}</span>
-          <span class="rate">+{fmt(insightPerSec($game))}/s</span>
+          {#if $game.era === 'algorithmic'}
+            {@const insDrain = rackInsightDrainPerSec($game)}
+            <span class="rate">+{fmt(insightPerSec($game))} − {fmt(insDrain)} = {insightPerSec($game) - insDrain >= 0 ? '+' : ''}{fmt(insightPerSec($game) - insDrain)}/s</span>
+          {:else}
+            <span class="rate">+{fmt(insightPerSec($game))}/s</span>
+          {/if}
+        </div>
+      {/if}
+      {#if $game.era === 'algorithmic'}
+        <div class="res">
+          <span class="label">Compute</span>
+          <span class="val">{fmt(computeAmt)} / {fmt(computeCap($game))}</span>
+          <span class="rate">+{fmt(computePerSec($game))}/s</span>
         </div>
       {/if}
     </div>
@@ -314,9 +330,9 @@
       </button>
 
       {#if upgradesHorizon}
-        {@const horCost = upgradesHorizon.cost.grain ?? upgradesHorizon.cost.output ?? upgradesHorizon.cost.insight ?? 0}
-        {@const horRes = upgradesHorizon.cost.grain !== undefined ? 'grain' : upgradesHorizon.cost.output !== undefined ? 'goods' : 'insight'}
-        {@const horHave = horRes === 'grain' ? grainAmt : horRes === 'goods' ? outputAmt : insightAmt}
+        {@const horCost = upgradesHorizon.cost.grain ?? upgradesHorizon.cost.output ?? upgradesHorizon.cost.insight ?? upgradesHorizon.cost.compute ?? 0}
+        {@const horRes = upgradesHorizon.cost.grain !== undefined ? 'grain' : upgradesHorizon.cost.output !== undefined ? 'goods' : upgradesHorizon.cost.insight !== undefined ? 'insight' : 'compute'}
+        {@const horHave = horRes === 'grain' ? grainAmt : horRes === 'goods' ? outputAmt : horRes === 'insight' ? insightAmt : computeAmt}
         {@const horPct = Math.max(0, Math.min(1, horHave / horCost))}
         <div class="horizon">
           <div class="horizon-fill" style="width: {horPct * 100}%"></div>
@@ -411,7 +427,7 @@
         </div>
       {/if}
 
-      {#if $game.era === 'information'}
+      {#if $game.era === 'information' || $game.era === 'algorithmic'}
         <div class="pane-head">
           <h2 class="sub">Wires & Signal</h2>
         </div>
@@ -445,6 +461,41 @@
           {/each}
         </div>
       {/if}
+
+      {#if $game.era === 'algorithmic'}
+        <div class="pane-head">
+          <h2 class="sub">Code & Compute</h2>
+        </div>
+        <div class="card-grid">
+          {#each visibleAlgorithmicUpgrades as u}
+            {@const lvl = $game.upgrades[u.id] ?? 0}
+            {@const max = u.max}
+            {@const maxed = max !== undefined && lvl >= max}
+            {@const bulk = nextAlgoBulkCost(u.id, $buyMode, $game)}
+            {@const have = bulk.res === 'insight' ? insightAmt : computeAmt}
+            {@const buyable = !maxed && bulk.n > 0 && have >= bulk.total}
+            <button
+              class="upgrade"
+              disabled={!buyable}
+              style="--fill: {Math.max(0, Math.min(1, have / Math.max(1, bulk.total))) * 100}%"
+              on:click={() => buyAlgorithmicUpgrade(u.id, $buyMode)}
+            >
+              <div class="row">
+                <strong>{u.name}</strong>
+                <span class="lvl">× {lvl}{max ? ` / ${max}` : ''}</span>
+              </div>
+              <div class="desc">{u.desc}</div>
+              <div class="cost">
+                {#if maxed}maxed
+                {:else if bulk.n === 0}—
+                {:else}
+                  buy {bulk.n} · {fmt(bulk.total)} {bulk.res}
+                {/if}
+              </div>
+            </button>
+          {/each}
+        </div>
+      {/if}
     </section>
 
     <section class="pane projects-pane">
@@ -461,7 +512,8 @@
         {@const grainOk = eff.grain === undefined || grainAmt >= eff.grain}
         {@const outputOk = eff.output === undefined || outputAmt >= eff.output}
         {@const insightOk = eff.insight === undefined || insightAmt >= eff.insight}
-        {@const affordable = grainOk && outputOk && insightOk}
+        {@const computeOk = eff.compute === undefined || computeAmt >= eff.compute}
+        {@const affordable = grainOk && outputOk && insightOk && computeOk}
         <button
           class="project"
           class:locked={!unlocked}
@@ -478,6 +530,7 @@
               {eff.grain !== undefined ? `${fmt(eff.grain)} grain` : ''}
               {eff.output !== undefined ? ` ${fmt(eff.output)} goods` : ''}
               {eff.insight !== undefined ? ` ${fmt(eff.insight)} insight` : ''}
+              {eff.compute !== undefined ? ` ${fmt(eff.compute)} compute` : ''}
             {/if}
           </div>
         </button>
