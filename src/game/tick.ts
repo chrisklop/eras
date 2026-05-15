@@ -4,6 +4,7 @@ import { tickAgrarian } from './eras/agrarian';
 import { tickIndustrial } from './eras/industrial';
 import { tickInformation } from './eras/information';
 import { tickAlgorithmic } from './eras/algorithmic';
+import { tickPosthuman } from './eras/posthuman';
 import { saveState } from './save';
 import { checkAchievements } from './achievements';
 
@@ -31,6 +32,9 @@ export function startLoop() {
     }
     if (s.era === 'algorithmic' || s.era === 'posthuman') {
       tickAlgorithmic(dt);
+    }
+    if (s.era === 'posthuman' || s.era === 'cosmic') {
+      tickPosthuman(dt);
     }
 
     // Track peaks for legacy calculation.

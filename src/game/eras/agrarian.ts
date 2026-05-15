@@ -241,6 +241,7 @@ export function consumptionPerPop(s: GameState = get(game)): number {
   );
   mult *= 1 - granaryRed;
   if (s.flags.hangingGardens) mult *= 0.8;
+  if (s.flags.behavioralConditioning) return 0;
   return BASE_FOOD_PER_POP * mult;
 }
 

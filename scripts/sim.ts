@@ -11,11 +11,12 @@ import { agrarianUpgrades, grainCap, popCap, popGrowthPerSec, grainPerSec, grain
 import { industrialUpgrades, outputCap, outputPerSec, grainDrainPerSec, coalCap, coalPerSec, coalDrainPerSec } from '../src/game/eras/industrial';
 import { informationUpgrades, insightCap, insightPerSec, stationGoodsDrainPerSec } from '../src/game/eras/information';
 import { algorithmicUpgrades, computeCap, computePerSec, rackInsightDrainPerSec } from '../src/game/eras/algorithmic';
+import { posthumanUpgrades, sentienceCap, sentiencePerSec, engineComputeDrainPerSec, popExtractedPerEngine } from '../src/game/eras/posthuman';
 import { projects, projectAvailable, canAffordProject } from '../src/game/projects';
 import { initialState, type GameState } from '../src/game/game';
 
 const TICK_DT = 0.1; // sim resolution: 100ms steps
-const MAX_SIM_TIME_SEC = 8 * 60 * 60; // bail after 8 simulated hours
+const MAX_SIM_TIME_SEC = 16 * 60 * 60; // bail after 16 simulated hours
 // Skip dumb buys: don't buy if wait time would exceed this many seconds.
 // A real player saves for bigger purchases instead.
 const SKIP_WAIT_OVER_SEC = 180;
@@ -84,7 +85,7 @@ function tick(s: GameState, dt: number) {
   }
 
   // Algorithmic: server racks drain insight → produce compute
-  if (s.era === 'algorithmic') {
+  if (s.era === 'algorithmic' || s.era === 'posthuman') {
     const racks = s.upgrades.serverRack ?? 0;
     if (racks > 0) {
       const insNeeded = rackInsightDrainPerSec(s) * dt;
@@ -93,6 +94,21 @@ function tick(s: GameState, dt: number) {
       s.resources.insight = Math.max(0, insAvail - insNeeded * f);
       const cCap = computeCap(s);
       s.resources.compute = Math.min(cCap, (s.resources.compute ?? 0) + computePerSec(s) * dt * f);
+    }
+  }
+
+  // Posthuman: cognition engines drain compute → produce sentience
+  if (s.era === 'posthuman') {
+    const engines = s.upgrades.cognitionEngine ?? 0;
+    const sCap = sentienceCap(s);
+    if (engines > 0) {
+      const cmpNeeded = engineComputeDrainPerSec(s) * dt;
+      const cmpAvail = s.resources.compute ?? 0;
+      const f = cmpNeeded > 0 ? Math.min(1, cmpAvail / cmpNeeded) : 1;
+      s.resources.compute = Math.max(0, cmpAvail - cmpNeeded * f);
+      s.resources.sentience = Math.min(sCap, (s.resources.sentience ?? 0) + sentiencePerSec(s) * dt * f);
+    } else {
+      s.resources.sentience = Math.min(sCap, (s.resources.sentience ?? 0) + sentiencePerSec(s) * dt);
     }
   }
   s.resources.grain = Math.max(0, Math.min(cap, (s.resources.grain ?? 0) + grainDelta));
@@ -177,7 +193,7 @@ function simulate(): { phases: PhaseLog[]; violations: string[]; reachedIR: bool
       applyProject(s, p.id);
       logPhase(`project: ${p.name}`);
       lastPurchaseTime = t;
-      if (p.id === 'aiBreakthrough') {
+      if (p.id === 'theOverride') {
         return { phases, violations, reachedIR: true, finalState: s, elapsed: t };
       }
       continue;
@@ -213,38 +229,72 @@ function simulate(): { phases: PhaseLog[]; violations: string[]; reachedIR: bool
 
     // Smarter buy: pick the cheapest affordable upgrade. Skip if it'd be
     // sized so we should be saving for something bigger (cost > 30% of cap).
-    type BuyOpt = { id: string; cost: number; res: 'grain' | 'output' | 'insight'; era: 'agrarian' | 'industrial' | 'information'; name: string };
+    type BuyOpt = { id: string; cost: number; res: 'grain' | 'output' | 'insight' | 'compute' | 'sentience'; era: 'agrarian' | 'industrial' | 'information'; name: string };
     let bestUpgrade: BuyOpt | null = null;
     const insightAmt = s.resources.insight ?? 0;
+    const computeAmt2 = s.resources.compute ?? 0;
+    const sentienceAmt = s.resources.sentience ?? 0;
     const considerSet = (upgrades: any[], era: 'agrarian' | 'industrial' | 'information') => {
       for (const u of upgrades) {
+        // Skip if not visible — mirrors real player UI.
+        if (typeof u.visible === 'function' && (s.upgrades[u.id] ?? 0) === 0 && !u.visible(s)) continue;
         const lvl = s.upgrades[u.id] ?? 0;
         const maxVal = u.max;
         if (maxVal !== undefined && lvl >= maxVal) continue;
         const c = u.cost(lvl);
-        const cost = c.grain ?? c.output ?? c.goods ?? c.insight ?? 0;
-        const resRaw = c.grain !== undefined ? 'grain' : c.output !== undefined ? 'output' : c.goods !== undefined ? 'output' : 'insight';
-        const res = resRaw as 'grain' | 'output' | 'insight';
-        const have = res === 'grain' ? grain : res === 'output' ? output : insightAmt;
+        const cost = c.grain ?? c.output ?? c.goods ?? c.insight ?? c.compute ?? c.sentience ?? 0;
+        const resRaw =
+          c.grain !== undefined ? 'grain' :
+          c.output !== undefined ? 'output' :
+          c.goods !== undefined ? 'output' :
+          c.insight !== undefined ? 'insight' :
+          c.compute !== undefined ? 'compute' :
+          'sentience';
+        const res = resRaw as 'grain' | 'output' | 'insight' | 'compute' | 'sentience';
+        const have =
+          res === 'grain' ? grain :
+          res === 'output' ? output :
+          res === 'insight' ? insightAmt :
+          res === 'compute' ? computeAmt2 :
+          sentienceAmt;
         if (cost > have) continue;
         if (!bestUpgrade || cost < bestUpgrade.cost) {
           bestUpgrade = { id: u.id, cost, res, era, name: u.name };
         }
       }
     };
-    considerSet(agrarianUpgrades, 'agrarian');
-    if (s.era === 'industrial' || s.era === 'information' || s.era === 'algorithmic') {
-      considerSet(industrialUpgrades as any, 'industrial');
-    }
-    if (s.era === 'information' || s.era === 'algorithmic') {
-      considerSet(informationUpgrades as any, 'information');
-    }
-    if (s.era === 'algorithmic') {
+    // Consider current-era buildings first so the sim doesn't permanently
+    // prefer cheap prior-era upgrades and stall progression.
+    if (s.era === 'posthuman') {
+      considerSet(posthumanUpgrades as any, 'information');
+      if (!bestUpgrade) considerSet(algorithmicUpgrades as any, 'information');
+      if (!bestUpgrade) considerSet(informationUpgrades as any, 'information');
+      if (!bestUpgrade) considerSet(industrialUpgrades as any, 'industrial');
+      if (!bestUpgrade) considerSet(agrarianUpgrades, 'agrarian');
+    } else if (s.era === 'algorithmic') {
       considerSet(algorithmicUpgrades as any, 'information');
+      if (!bestUpgrade) considerSet(informationUpgrades as any, 'information');
+      if (!bestUpgrade) considerSet(industrialUpgrades as any, 'industrial');
+      if (!bestUpgrade) considerSet(agrarianUpgrades, 'agrarian');
+    } else if (s.era === 'information') {
+      considerSet(informationUpgrades as any, 'information');
+      if (!bestUpgrade) considerSet(industrialUpgrades as any, 'industrial');
+      if (!bestUpgrade) considerSet(agrarianUpgrades, 'agrarian');
+    } else if (s.era === 'industrial') {
+      considerSet(industrialUpgrades as any, 'industrial');
+      if (!bestUpgrade) considerSet(agrarianUpgrades, 'agrarian');
+    } else {
+      considerSet(agrarianUpgrades, 'agrarian');
     }
 
     if (bestUpgrade) {
       const lvl = s.upgrades[bestUpgrade.id] ?? 0;
+      if (bestUpgrade.id === 'cognitionEngine') {
+        const extract = popExtractedPerEngine(s);
+        const popAvail = s.resources.pop ?? 0;
+        if (popAvail < extract) continue;
+        s.resources.pop = popAvail - extract;
+      }
       spendResource(s, bestUpgrade.res, bestUpgrade.cost);
       s.upgrades[bestUpgrade.id] = lvl + 1;
       lastPurchaseTime = t;

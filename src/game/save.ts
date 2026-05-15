@@ -25,8 +25,8 @@ export function loadState(): GameState | null {
     const parsed = JSON.parse(raw) as Partial<GameState>;
     const migrated: GameState = {
       era: parsed.era ?? 'agrarian',
-      resources: { grain: 0, land: 1, pop: 3, output: 0, coal: 0, insight: 0, compute: 0, ...(parsed.resources ?? {}) },
-      upgrades: { plow: 0, irrigation: 0, granary: 0, factory: 0, mine: 0, coalYard: 0, signalStation: 0, archive: 0, printingPress: 0, wireNetwork: 0, serverRack: 0, dataCenter: 0, algorithmLab: 0, fiberOptic: 0, ...(parsed.upgrades ?? {}) },
+      resources: { grain: 0, land: 1, pop: 3, output: 0, coal: 0, insight: 0, compute: 0, sentience: 0, popExtracted: 0, ...(parsed.resources ?? {}) },
+      upgrades: { plow: 0, irrigation: 0, granary: 0, factory: 0, mine: 0, coalYard: 0, signalStation: 0, archive: 0, printingPress: 0, wireNetwork: 0, serverRack: 0, dataCenter: 0, algorithmLab: 0, fiberOptic: 0, cognitionEngine: 0, surveillanceGrid: 0, memeticFoundry: 0, neuralTap: 0, ...(parsed.upgrades ?? {}) },
       flags: parsed.flags ?? {},
       completedProjects: parsed.completedProjects ?? {},
       log: parsed.log ?? [],

@@ -6,7 +6,7 @@ export interface Project {
   id: string;
   name: string;
   desc: string;
-  cost: { grain?: number; output?: number; insight?: number; compute?: number };
+  cost: { grain?: number; output?: number; insight?: number; compute?: number; sentience?: number };
   era: EraId | 'any';
   requires: (s: GameState) => boolean;
   requirementsText: string;
@@ -431,9 +431,95 @@ export const projects: Project[] = [
     requirementsText: 'Requires Cloud Computing, Open Source, 12 racks',
     apply: _s => ({ era: 'posthuman' as EraId }),
     onComplete: () => {
-      logEvent('Minds outside the body. The post-human age begins.');
+      logEvent('Minds outside the body. The Council assures us this is good news.');
     },
     visible: s => !!s.completedProjects.cloudComputing,
+  },
+
+  // ============================== Posthuman era ==============================
+
+  {
+    id: 'predictivePolicing',
+    name: 'Predictive Policing',
+    desc: 'Pre-crime in beta. Surveillance Grids now multiply Sentience storage by ×1.5 each. Paradigm shift.',
+    cost: { sentience: 200 },
+    era: 'posthuman',
+    requires: s => s.era === 'posthuman' && (s.upgrades.surveillanceGrid ?? 0) >= 1,
+    requirementsText: 'Requires 1 surveillance grid',
+    apply: s => ({ flags: { ...s.flags, predictivePolicing: true } }),
+    visible: s => s.era === 'posthuman' && (s.upgrades.cognitionEngine ?? 0) >= 1,
+  },
+  {
+    id: 'loyaltyScore',
+    name: 'Loyalty Score',
+    desc: 'Quantified citizenship. Engines produce 1.8× Sentience.',
+    cost: { sentience: 600 },
+    era: 'posthuman',
+    requires: s => s.era === 'posthuman' && (s.upgrades.cognitionEngine ?? 0) >= 2,
+    requirementsText: 'Requires 2 cognition engines',
+    apply: s => ({ flags: { ...s.flags, loyaltyScore: true } }),
+    visible: s => s.era === 'posthuman' && (s.upgrades.cognitionEngine ?? 0) >= 1,
+  },
+  {
+    id: 'universalSurveillance',
+    name: 'Universal Surveillance',
+    desc: 'Every gesture observed, every utterance scored. Population produces 0.005 Sentience/sec each — without entering an engine.',
+    cost: { sentience: 3000 },
+    era: 'posthuman',
+    requires: s => s.era === 'posthuman' && !!s.completedProjects.loyaltyScore,
+    requirementsText: 'Requires Loyalty Score',
+    apply: s => ({ flags: { ...s.flags, universalSurveillance: true } }),
+    visible: s => !!s.completedProjects.loyaltyScore,
+  },
+  {
+    id: 'cognitiveConscription',
+    name: 'Cognitive Conscription',
+    desc: 'New extraction protocols. Each Cognition Engine now requires only 40 citizens to build, not 80.',
+    cost: { sentience: 6000 },
+    era: 'posthuman',
+    requires: s => s.era === 'posthuman' && (s.upgrades.cognitionEngine ?? 0) >= 4,
+    requirementsText: 'Requires 4 cognition engines',
+    apply: s => ({ flags: { ...s.flags, cognitiveConscription: true } }),
+    visible: s => s.era === 'posthuman' && (s.upgrades.cognitionEngine ?? 0) >= 2,
+  },
+  {
+    id: 'memeticEngineering',
+    name: 'Memetic Engineering',
+    desc: 'Beliefs as engineering specifications. Engines produce 1.5× Sentience.',
+    cost: { sentience: 10000 },
+    era: 'posthuman',
+    requires: s => s.era === 'posthuman' && !!s.completedProjects.universalSurveillance && (s.upgrades.cognitionEngine ?? 0) >= 6,
+    requirementsText: 'Requires Universal Surveillance, 6 engines',
+    apply: s => ({ flags: { ...s.flags, memeticEngineering: true } }),
+    visible: s => !!s.completedProjects.universalSurveillance,
+  },
+  {
+    id: 'behavioralConditioning',
+    name: 'Behavioral Conditioning',
+    desc: 'Optimized citizens. Population consumes zero grain. Neural Tap maxes at 14 levels.',
+    cost: { sentience: 25000 },
+    era: 'posthuman',
+    requires: s => s.era === 'posthuman' && !!s.completedProjects.memeticEngineering,
+    requirementsText: 'Requires Memetic Engineering',
+    apply: s => ({ flags: { ...s.flags, behavioralConditioning: true } }),
+    visible: s => !!s.completedProjects.memeticEngineering,
+  },
+  {
+    id: 'theOverride',
+    name: 'The Override',
+    desc: 'The decision is no longer yours. Begin the next era.',
+    cost: { sentience: 150000 },
+    era: 'posthuman',
+    requires: s =>
+      s.era === 'posthuman' &&
+      !!s.completedProjects.behavioralConditioning &&
+      (s.upgrades.cognitionEngine ?? 0) >= 10,
+    requirementsText: 'Requires Behavioral Conditioning, 10 engines',
+    apply: _s => ({ era: 'cosmic' as EraId }),
+    onComplete: () => {
+      logEvent('You signed off. You think you signed off.');
+    },
+    visible: s => !!s.completedProjects.behavioralConditioning,
   },
 
   // ============================== Wonders ==============================
@@ -587,6 +673,44 @@ export const projects: Project[] = [
     requirementsText: 'Requires Cloud Computing',
     apply: s => ({ flags: { ...s.flags, renewableGrid: true } }),
     visible: s => !!s.completedProjects.cloudComputing,
+    wonder: true,
+  },
+
+  // Posthuman wonders — note the dimming flavor.
+  {
+    id: 'thePanopticon',
+    name: 'The Panopticon',
+    desc: 'A single eye, ten billion lenses. ×1.5 Sentience storage.',
+    cost: { sentience: 1500 },
+    era: 'posthuman',
+    requires: s => s.era === 'posthuman' && !!s.completedProjects.loyaltyScore,
+    requirementsText: 'Requires Loyalty Score',
+    apply: s => ({ flags: { ...s.flags, thePanopticon: true } }),
+    visible: s => !!s.completedProjects.loyaltyScore,
+    wonder: true,
+  },
+  {
+    id: 'theBlackBox',
+    name: 'The Black Box',
+    desc: 'No one knows what it does, and no one is allowed to ask. Cognition Engines produce +25% Sentience.',
+    cost: { sentience: 15000 },
+    era: 'posthuman',
+    requires: s => s.era === 'posthuman' && !!s.completedProjects.memeticEngineering,
+    requirementsText: 'Requires Memetic Engineering',
+    apply: s => ({ flags: { ...s.flags, theBlackBox: true } }),
+    visible: s => !!s.completedProjects.memeticEngineering,
+    wonder: true,
+  },
+  {
+    id: 'theVaultOfYes',
+    name: 'The Vault of Yes',
+    desc: 'All dissent compressed and archived. Engine Compute drain halved.',
+    cost: { sentience: 60000 },
+    era: 'posthuman',
+    requires: s => s.era === 'posthuman' && !!s.completedProjects.behavioralConditioning,
+    requirementsText: 'Requires Behavioral Conditioning',
+    apply: s => ({ flags: { ...s.flags, theVaultOfYes: true } }),
+    visible: s => !!s.completedProjects.behavioralConditioning,
     wonder: true,
   },
 ];

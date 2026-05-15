@@ -5,6 +5,7 @@
   import { industrialUpgrades, buyIndustrialUpgrade, nextBulkCost, outputPerSec, grainDrainPerSec, outputCap, coalCap, coalPerSec, coalDrainPerSec } from './game/eras/industrial';
   import { informationUpgrades, informationUpgradeVisible, buyInformationUpgrade, nextInfoBulkCost, insightPerSec, insightCap, stationGoodsDrainPerSec } from './game/eras/information';
   import { algorithmicUpgrades, algorithmicUpgradeVisible, buyAlgorithmicUpgrade, nextAlgoBulkCost, computePerSec, computeCap, rackInsightDrainPerSec } from './game/eras/algorithmic';
+  import { posthumanUpgrades, posthumanUpgradeVisible, buyPosthumanUpgrade, nextPostBulkCost, sentiencePerSec, sentienceCap, engineComputeDrainPerSec, popExtractedPerEngine } from './game/eras/posthuman';
   import { projects, projectAvailable, projectIncomplete, projectVisible, completeProject, effectiveProjectCost } from './game/projects';
   import { industrialUpgradeVisible } from './game/eras/industrial';
   import { startLoop, stopLoop } from './game/tick';
@@ -104,12 +105,13 @@
     grain: grainProduction - grainConsumption,
     goods: outputPerSec($game) - (($game.era === 'information' || $game.era === 'algorithmic') ? stationGoodsDrainPerSec($game) : 0),
     insight: insightPerSec($game) - ($game.era === 'algorithmic' ? rackInsightDrainPerSec($game) : 0),
-    compute: computePerSec($game),
+    compute: computePerSec($game) - ($game.era === 'posthuman' ? engineComputeDrainPerSec($game) : 0),
+    sentience: sentiencePerSec($game),
     output: outputPerSec($game) - (($game.era === 'information' || $game.era === 'algorithmic') ? stationGoodsDrainPerSec($game) : 0),
   } as Record<string, number>;
   $: haveOf = {
     grain: grainAmt, goods: outputAmt, output: outputAmt,
-    insight: insightAmt, compute: computeAmt,
+    insight: insightAmt, compute: computeAmt, sentience: sentienceAmt,
   } as Record<string, number>;
   /** ETA for "need N of <res>" given current stockpile and net rate. */
   function etaForRes(target: number, resKey: string): string {
@@ -143,8 +145,11 @@
   $: visibleIndustrialUpgrades = industrialUpgrades.filter(u => industrialUpgradeVisible(u, $game));
   $: visibleInformationUpgrades = informationUpgrades.filter(u => informationUpgradeVisible(u, $game));
   $: visibleAlgorithmicUpgrades = algorithmicUpgrades.filter(u => algorithmicUpgradeVisible(u, $game));
+  $: visiblePosthumanUpgrades = posthumanUpgrades.filter(u => posthumanUpgradeVisible(u, $game));
   $: insightAmt = $game.resources.insight ?? 0;
   $: computeAmt = $game.resources.compute ?? 0;
+  $: sentienceAmt = $game.resources.sentience ?? 0;
+  $: popExtractedAmt = $game.resources.popExtracted ?? 0;
   $: laborDemandVal = laborDemand($game);
   $: laborFractionVal = laborFraction($game);
   $: idleWorkers = Math.max(0, Math.floor(popAmt - laborDemandVal));
@@ -163,9 +168,9 @@
 
   /** Find the nearest locked project for a given era — the "horizon". */
   function projectCostScalar(p: typeof projects[number]): number {
-    return p.cost.grain ?? p.cost.output ?? p.cost.insight ?? p.cost.compute ?? 0;
+    return p.cost.grain ?? p.cost.output ?? p.cost.insight ?? p.cost.compute ?? p.cost.sentience ?? 0;
   }
-  function nextHorizon(era: 'agrarian' | 'industrial' | 'information' | 'algorithmic') {
+  function nextHorizon(era: 'agrarian' | 'industrial' | 'information' | 'algorithmic' | 'posthuman') {
     const locked = projects.filter(p =>
       projectIncomplete(p, $game) &&
       !projectAvailable(p, $game) &&
@@ -183,6 +188,7 @@
   }
 
   $: upgradesHorizon = nextHorizon(
+    $game.era === 'posthuman' ? 'posthuman' :
     $game.era === 'algorithmic' ? 'algorithmic' :
     $game.era === 'information' ? 'information' :
     $game.era === 'industrial' ? 'industrial' : 'agrarian'
@@ -291,17 +297,43 @@
           {/if}
         </div>
       {/if}
-      {#if $game.era === 'algorithmic'}
+      {#if $game.era === 'algorithmic' || $game.era === 'posthuman'}
         {@const cCapVal = computeCap($game)}
-        {@const cRate = computePerSec($game)}
+        {@const cDrain = $game.era === 'posthuman' ? engineComputeDrainPerSec($game) : 0}
+        {@const cNet = computePerSec($game) - cDrain}
         <div class="res">
           <span class="label">Compute</span>
           <span class="val">{fmt(computeAmt)} / {fmt(cCapVal)}</span>
-          <span class="rate">+{fmt(cRate)}/s</span>
-          {#if cRate > 0 && computeAmt < cCapVal}
-            <span class="eta">full in {etaToCap(computeAmt, cCapVal, cRate)}</span>
+          {#if cDrain > 0}
+            <span class="rate">+{fmt(computePerSec($game))} − {fmt(cDrain)} = {cNet >= 0 ? '+' : ''}{fmt(cNet)}/s</span>
+          {:else}
+            <span class="rate">+{fmt(computePerSec($game))}/s</span>
+          {/if}
+          {#if cNet > 0 && computeAmt < cCapVal}
+            <span class="eta">full in {etaToCap(computeAmt, cCapVal, cNet)}</span>
+          {:else if cNet < 0 && computeAmt > 0}
+            <span class="eta starving">empty in {fmtEta(computeAmt / -cNet)}</span>
           {/if}
         </div>
+      {/if}
+      {#if $game.era === 'posthuman'}
+        {@const sCapVal = sentienceCap($game)}
+        {@const sRate = sentiencePerSec($game)}
+        <div class="res">
+          <span class="label">Sentience</span>
+          <span class="val">{fmt(sentienceAmt)} / {fmt(sCapVal)}</span>
+          <span class="rate">+{fmt(sRate)}/s</span>
+          {#if sRate > 0 && sentienceAmt < sCapVal}
+            <span class="eta">full in {etaToCap(sentienceAmt, sCapVal, sRate)}</span>
+          {/if}
+        </div>
+        {#if popExtractedAmt > 0}
+          <div class="res">
+            <span class="label">Extracted</span>
+            <span class="val extracted-val">{fmt(popExtractedAmt)}</span>
+            <span class="rate dim">in the engines</span>
+          </div>
+        {/if}
       {/if}
     </div>
     {#if buffSecondsLeft > 0}
@@ -461,9 +493,9 @@
       </button>
 
       {#if upgradesHorizon}
-        {@const horCost = upgradesHorizon.cost.grain ?? upgradesHorizon.cost.output ?? upgradesHorizon.cost.insight ?? upgradesHorizon.cost.compute ?? 0}
-        {@const horRes = upgradesHorizon.cost.grain !== undefined ? 'grain' : upgradesHorizon.cost.output !== undefined ? 'goods' : upgradesHorizon.cost.insight !== undefined ? 'insight' : 'compute'}
-        {@const horHave = horRes === 'grain' ? grainAmt : horRes === 'goods' ? outputAmt : horRes === 'insight' ? insightAmt : computeAmt}
+        {@const horCost = upgradesHorizon.cost.grain ?? upgradesHorizon.cost.output ?? upgradesHorizon.cost.insight ?? upgradesHorizon.cost.compute ?? upgradesHorizon.cost.sentience ?? 0}
+        {@const horRes = upgradesHorizon.cost.grain !== undefined ? 'grain' : upgradesHorizon.cost.output !== undefined ? 'goods' : upgradesHorizon.cost.insight !== undefined ? 'insight' : upgradesHorizon.cost.compute !== undefined ? 'compute' : 'sentience'}
+        {@const horHave = horRes === 'grain' ? grainAmt : horRes === 'goods' ? outputAmt : horRes === 'insight' ? insightAmt : horRes === 'compute' ? computeAmt : sentienceAmt}
         {@const horPct = Math.max(0, Math.min(1, horHave / horCost))}
         <div class="horizon">
           <div class="horizon-fill" style="width: {horPct * 100}%"></div>
@@ -606,7 +638,7 @@
         </div>
       {/if}
 
-      {#if $game.era === 'algorithmic'}
+      {#if $game.era === 'algorithmic' || $game.era === 'posthuman'}
         <div class="pane-head">
           <h2 class="sub">Code & Compute</h2>
         </div>
@@ -641,6 +673,48 @@
           {/each}
         </div>
       {/if}
+
+      {#if $game.era === 'posthuman'}
+        <div class="pane-head">
+          <h2 class="sub">Mind & Machine</h2>
+        </div>
+        <div class="card-grid">
+          {#each visiblePosthumanUpgrades as u}
+            {@const lvl = $game.upgrades[u.id] ?? 0}
+            {@const max = u.max}
+            {@const maxed = max !== undefined && lvl >= max}
+            {@const bulk = nextPostBulkCost(u.id, $buyMode, $game)}
+            {@const have = bulk.res === 'compute' ? computeAmt : sentienceAmt}
+            {@const buyable = !maxed && bulk.n > 0 && have >= bulk.total}
+            {@const isEngine = u.id === 'cognitionEngine'}
+            {@const extractPer = isEngine ? popExtractedPerEngine($game) : 0}
+            <button
+              class="upgrade"
+              class:posthuman-engine={isEngine}
+              disabled={!buyable}
+              style="--fill: {Math.max(0, Math.min(1, have / Math.max(1, bulk.total))) * 100}%"
+              on:click={() => buyPosthumanUpgrade(u.id, $buyMode)}
+            >
+              <div class="row">
+                <strong>{u.name}</strong>
+                <span class="lvl">× {lvl}{max ? ` / ${max}` : ''}</span>
+              </div>
+              <div class="desc">{u.desc}</div>
+              {#if isEngine}
+                <div class="desc dim small">Extracts {extractPer} citizens per engine, permanently.</div>
+              {/if}
+              <div class="cost">
+                {#if maxed}maxed
+                {:else if bulk.n === 0}—
+                {:else}
+                  buy {bulk.n} · {fmt(bulk.total)} {bulk.res}
+                  {#if !buyable}<span class="eta-inline">· in {etaForRes(bulk.total, bulk.res)}</span>{/if}
+                {/if}
+              </div>
+            </button>
+          {/each}
+        </div>
+      {/if}
     </section>
 
     <section class="pane projects-pane">
@@ -658,7 +732,8 @@
         {@const outputOk = eff.output === undefined || outputAmt >= eff.output}
         {@const insightOk = eff.insight === undefined || insightAmt >= eff.insight}
         {@const computeOk = eff.compute === undefined || computeAmt >= eff.compute}
-        {@const affordable = grainOk && outputOk && insightOk && computeOk}
+        {@const sentienceOk = eff.sentience === undefined || sentienceAmt >= eff.sentience}
+        {@const affordable = grainOk && outputOk && insightOk && computeOk && sentienceOk}
         <button
           class="project"
           class:locked={!unlocked}
@@ -676,8 +751,9 @@
               {eff.output !== undefined ? ` ${fmt(eff.output)} goods` : ''}
               {eff.insight !== undefined ? ` ${fmt(eff.insight)} insight` : ''}
               {eff.compute !== undefined ? ` ${fmt(eff.compute)} compute` : ''}
+              {eff.sentience !== undefined ? ` ${fmt(eff.sentience)} sentience` : ''}
               {#if !affordable}
-                {@const blockingRes = !grainOk ? 'grain' : !outputOk ? 'output' : !insightOk ? 'insight' : 'compute'}
+                {@const blockingRes = !grainOk ? 'grain' : !outputOk ? 'output' : !insightOk ? 'insight' : !computeOk ? 'compute' : 'sentience'}
                 {@const blockingCost = eff[blockingRes] ?? 0}
                 <span class="eta-inline">· in {etaForRes(blockingCost, blockingRes)}</span>
               {/if}
@@ -1145,6 +1221,12 @@
     text-transform: uppercase; opacity: 0.65; margin-top: 0.25rem;
     font-family: var(--font-mono, monospace);
   }
+
+  .posthuman-engine {
+    border-left: 3px solid var(--ember, #c5583a);
+    background: linear-gradient(180deg, rgba(197,88,58,0.06) 0%, rgba(197,88,58,0.0) 100%);
+  }
+  .extracted-val { color: var(--ember, #c5583a); }
 
   .eta { font-size: 0.62rem; opacity: 0.55; letter-spacing: 0.06em; text-transform: uppercase; display: block; margin-top: 0.15rem; }
   .eta.starving { color: var(--ember, #c5583a); opacity: 0.9; }
