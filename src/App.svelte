@@ -6,6 +6,7 @@
   import { informationUpgrades, informationUpgradeVisible, buyInformationUpgrade, nextInfoBulkCost, insightPerSec, insightCap, stationGoodsDrainPerSec } from './game/eras/information';
   import { algorithmicUpgrades, algorithmicUpgradeVisible, buyAlgorithmicUpgrade, nextAlgoBulkCost, computePerSec, computeCap, rackInsightDrainPerSec } from './game/eras/algorithmic';
   import { posthumanUpgrades, posthumanUpgradeVisible, buyPosthumanUpgrade, nextPostBulkCost, sentiencePerSec, sentienceCap, engineComputeDrainPerSec, popExtractedPerEngine } from './game/eras/posthuman';
+  import { cosmicUpgrades, cosmicUpgradeVisible, buyCosmicUpgrade, nextCosmicBulkCost, reachPerSec, reachCap, shipSentienceDrainPerSec, popDeployedPerShip } from './game/eras/cosmic';
   import { projects, projectAvailable, projectIncomplete, projectVisible, completeProject, effectiveProjectCost } from './game/projects';
   import { industrialUpgradeVisible } from './game/eras/industrial';
   import { startLoop, stopLoop } from './game/tick';
@@ -106,12 +107,13 @@
     goods: outputPerSec($game) - (($game.era === 'information' || $game.era === 'algorithmic') ? stationGoodsDrainPerSec($game) : 0),
     insight: insightPerSec($game) - ($game.era === 'algorithmic' ? rackInsightDrainPerSec($game) : 0),
     compute: computePerSec($game) - ($game.era === 'posthuman' ? engineComputeDrainPerSec($game) : 0),
-    sentience: sentiencePerSec($game),
+    sentience: sentiencePerSec($game) - ($game.era === 'cosmic' ? shipSentienceDrainPerSec($game) : 0),
+    reach: reachPerSec($game),
     output: outputPerSec($game) - (($game.era === 'information' || $game.era === 'algorithmic') ? stationGoodsDrainPerSec($game) : 0),
   } as Record<string, number>;
   $: haveOf = {
     grain: grainAmt, goods: outputAmt, output: outputAmt,
-    insight: insightAmt, compute: computeAmt, sentience: sentienceAmt,
+    insight: insightAmt, compute: computeAmt, sentience: sentienceAmt, reach: reachAmt,
   } as Record<string, number>;
   /** ETA for "need N of <res>" given current stockpile and net rate. */
   function etaForRes(target: number, resKey: string): string {
@@ -146,10 +148,13 @@
   $: visibleInformationUpgrades = informationUpgrades.filter(u => informationUpgradeVisible(u, $game));
   $: visibleAlgorithmicUpgrades = algorithmicUpgrades.filter(u => algorithmicUpgradeVisible(u, $game));
   $: visiblePosthumanUpgrades = posthumanUpgrades.filter(u => posthumanUpgradeVisible(u, $game));
+  $: visibleCosmicUpgrades = cosmicUpgrades.filter(u => cosmicUpgradeVisible(u, $game));
   $: insightAmt = $game.resources.insight ?? 0;
   $: computeAmt = $game.resources.compute ?? 0;
   $: sentienceAmt = $game.resources.sentience ?? 0;
+  $: reachAmt = $game.resources.reach ?? 0;
   $: popExtractedAmt = $game.resources.popExtracted ?? 0;
+  $: colonizedAmt = $game.resources.colonized ?? 0;
   $: laborDemandVal = laborDemand($game);
   $: laborFractionVal = laborFraction($game);
   $: idleWorkers = Math.max(0, Math.floor(popAmt - laborDemandVal));
@@ -168,9 +173,9 @@
 
   /** Find the nearest locked project for a given era — the "horizon". */
   function projectCostScalar(p: typeof projects[number]): number {
-    return p.cost.grain ?? p.cost.output ?? p.cost.insight ?? p.cost.compute ?? p.cost.sentience ?? 0;
+    return p.cost.grain ?? p.cost.output ?? p.cost.insight ?? p.cost.compute ?? p.cost.sentience ?? p.cost.reach ?? 0;
   }
-  function nextHorizon(era: 'agrarian' | 'industrial' | 'information' | 'algorithmic' | 'posthuman') {
+  function nextHorizon(era: 'agrarian' | 'industrial' | 'information' | 'algorithmic' | 'posthuman' | 'cosmic') {
     const locked = projects.filter(p =>
       projectIncomplete(p, $game) &&
       !projectAvailable(p, $game) &&
@@ -188,6 +193,7 @@
   }
 
   $: upgradesHorizon = nextHorizon(
+    $game.era === 'cosmic' ? 'cosmic' :
     $game.era === 'posthuman' ? 'posthuman' :
     $game.era === 'algorithmic' ? 'algorithmic' :
     $game.era === 'information' ? 'information' :
@@ -316,15 +322,22 @@
           {/if}
         </div>
       {/if}
-      {#if $game.era === 'posthuman'}
+      {#if $game.era === 'posthuman' || $game.era === 'cosmic'}
         {@const sCapVal = sentienceCap($game)}
-        {@const sRate = sentiencePerSec($game)}
+        {@const sDrain = $game.era === 'cosmic' ? shipSentienceDrainPerSec($game) : 0}
+        {@const sNet = sentiencePerSec($game) - sDrain}
         <div class="res">
           <span class="label">Sentience</span>
           <span class="val">{fmt(sentienceAmt)} / {fmt(sCapVal)}</span>
-          <span class="rate">+{fmt(sRate)}/s</span>
-          {#if sRate > 0 && sentienceAmt < sCapVal}
-            <span class="eta">full in {etaToCap(sentienceAmt, sCapVal, sRate)}</span>
+          {#if sDrain > 0}
+            <span class="rate">+{fmt(sentiencePerSec($game))} − {fmt(sDrain)} = {sNet >= 0 ? '+' : ''}{fmt(sNet)}/s</span>
+          {:else}
+            <span class="rate">+{fmt(sentiencePerSec($game))}/s</span>
+          {/if}
+          {#if sNet > 0 && sentienceAmt < sCapVal}
+            <span class="eta">full in {etaToCap(sentienceAmt, sCapVal, sNet)}</span>
+          {:else if sNet < 0 && sentienceAmt > 0}
+            <span class="eta starving">empty in {fmtEta(sentienceAmt / -sNet)}</span>
           {/if}
         </div>
         {#if popExtractedAmt > 0}
@@ -332,6 +345,25 @@
             <span class="label">Extracted</span>
             <span class="val extracted-val">{fmt(popExtractedAmt)}</span>
             <span class="rate dim">in the engines</span>
+          </div>
+        {/if}
+      {/if}
+      {#if $game.era === 'cosmic'}
+        {@const rCapVal = reachCap($game)}
+        {@const rRate = reachPerSec($game)}
+        <div class="res">
+          <span class="label">Reach</span>
+          <span class="val">{fmt(reachAmt)} / {fmt(rCapVal)}</span>
+          <span class="rate">+{fmt(rRate)}/s</span>
+          {#if rRate > 0 && reachAmt < rCapVal}
+            <span class="eta">full in {etaToCap(reachAmt, rCapVal, rRate)}</span>
+          {/if}
+        </div>
+        {#if colonizedAmt > 0}
+          <div class="res">
+            <span class="label">Colonized</span>
+            <span class="val colonized-val">{fmt(colonizedAmt)}</span>
+            <span class="rate dim">in the stars</span>
           </div>
         {/if}
       {/if}
@@ -418,6 +450,49 @@
     </div>
   {/if}
 
+  {#if $game.gameWon}
+    <div class="modal-backdrop">
+      <div class="modal victory-modal" on:click|stopPropagation>
+        <header class="modal-head">
+          <h2>Kardashev II</h2>
+        </header>
+        <div class="legacy-summary">
+          <div class="dim small">A civilization that harnesses an entire star.</div>
+          <div><strong>Run complete.</strong></div>
+        </div>
+        <section class="legacy-nodes">
+          <div class="node owned">
+            <div class="node-head"><strong>Population</strong><span class="node-cost">{fmt(popAmt)}</span></div>
+          </div>
+          <div class="node owned">
+            <div class="node-head"><strong>Extracted</strong><span class="node-cost">{fmt(popExtractedAmt)}</span></div>
+          </div>
+          <div class="node owned">
+            <div class="node-head"><strong>Colonized</strong><span class="node-cost">{fmt(colonizedAmt)}</span></div>
+          </div>
+          <div class="node owned">
+            <div class="node-head"><strong>Projects done</strong><span class="node-cost">{completedCount}</span></div>
+          </div>
+          <div class="node owned">
+            <div class="node-head"><strong>Wonders built</strong><span class="node-cost">{builtWonders.length}</span></div>
+          </div>
+          <div class="node owned">
+            <div class="node-head"><strong>Achievements</strong><span class="node-cost">{Object.keys($achievements.earned).length} / {ACHIEVEMENTS.length}</span></div>
+          </div>
+          <div class="node owned">
+            <div class="node-head"><strong>Legacy collapses</strong><span class="node-cost">{$legacy.collapses}</span></div>
+          </div>
+        </section>
+        <section class="legacy-collapse">
+          <p class="dim small">The signal reaches the next star. The pattern continues. <em>Collapse</em> to start a new civilization with your accumulated Legacy.</p>
+          <button class="collapse-btn" on:click={() => { doCollapse(); }}>
+            Collapse for new run
+          </button>
+        </section>
+      </div>
+    </div>
+  {/if}
+
   {#if offlineReport}
     <div class="modal-backdrop" on:click={() => (offlineReport = null)}>
       <div class="modal welcome-modal" on:click|stopPropagation>
@@ -493,9 +568,9 @@
       </button>
 
       {#if upgradesHorizon}
-        {@const horCost = upgradesHorizon.cost.grain ?? upgradesHorizon.cost.output ?? upgradesHorizon.cost.insight ?? upgradesHorizon.cost.compute ?? upgradesHorizon.cost.sentience ?? 0}
-        {@const horRes = upgradesHorizon.cost.grain !== undefined ? 'grain' : upgradesHorizon.cost.output !== undefined ? 'goods' : upgradesHorizon.cost.insight !== undefined ? 'insight' : upgradesHorizon.cost.compute !== undefined ? 'compute' : 'sentience'}
-        {@const horHave = horRes === 'grain' ? grainAmt : horRes === 'goods' ? outputAmt : horRes === 'insight' ? insightAmt : horRes === 'compute' ? computeAmt : sentienceAmt}
+        {@const horCost = upgradesHorizon.cost.grain ?? upgradesHorizon.cost.output ?? upgradesHorizon.cost.insight ?? upgradesHorizon.cost.compute ?? upgradesHorizon.cost.sentience ?? upgradesHorizon.cost.reach ?? 0}
+        {@const horRes = upgradesHorizon.cost.grain !== undefined ? 'grain' : upgradesHorizon.cost.output !== undefined ? 'goods' : upgradesHorizon.cost.insight !== undefined ? 'insight' : upgradesHorizon.cost.compute !== undefined ? 'compute' : upgradesHorizon.cost.sentience !== undefined ? 'sentience' : 'reach'}
+        {@const horHave = horRes === 'grain' ? grainAmt : horRes === 'goods' ? outputAmt : horRes === 'insight' ? insightAmt : horRes === 'compute' ? computeAmt : horRes === 'sentience' ? sentienceAmt : reachAmt}
         {@const horPct = Math.max(0, Math.min(1, horHave / horCost))}
         <div class="horizon">
           <div class="horizon-fill" style="width: {horPct * 100}%"></div>
@@ -674,7 +749,7 @@
         </div>
       {/if}
 
-      {#if $game.era === 'posthuman'}
+      {#if $game.era === 'posthuman' || $game.era === 'cosmic'}
         <div class="pane-head">
           <h2 class="sub">Mind & Machine</h2>
         </div>
@@ -715,6 +790,48 @@
           {/each}
         </div>
       {/if}
+
+      {#if $game.era === 'cosmic'}
+        <div class="pane-head">
+          <h2 class="sub">Engine & Star</h2>
+        </div>
+        <div class="card-grid">
+          {#each visibleCosmicUpgrades as u}
+            {@const lvl = $game.upgrades[u.id] ?? 0}
+            {@const max = u.max}
+            {@const maxed = max !== undefined && lvl >= max}
+            {@const bulk = nextCosmicBulkCost(u.id, $buyMode, $game)}
+            {@const have = bulk.res === 'sentience' ? sentienceAmt : reachAmt}
+            {@const buyable = !maxed && bulk.n > 0 && have >= bulk.total}
+            {@const isShip = u.id === 'colonyShip'}
+            {@const deployPer = isShip ? popDeployedPerShip($game) : 0}
+            <button
+              class="upgrade"
+              class:cosmic-ship={isShip}
+              disabled={!buyable}
+              style="--fill: {Math.max(0, Math.min(1, have / Math.max(1, bulk.total))) * 100}%"
+              on:click={() => buyCosmicUpgrade(u.id, $buyMode)}
+            >
+              <div class="row">
+                <strong>{u.name}</strong>
+                <span class="lvl">× {lvl}{max ? ` / ${max}` : ''}</span>
+              </div>
+              <div class="desc">{u.desc}</div>
+              {#if isShip}
+                <div class="desc dim small">Deploys {deployPer} colonists per ship, off-world.</div>
+              {/if}
+              <div class="cost">
+                {#if maxed}maxed
+                {:else if bulk.n === 0}—
+                {:else}
+                  buy {bulk.n} · {fmt(bulk.total)} {bulk.res}
+                  {#if !buyable}<span class="eta-inline">· in {etaForRes(bulk.total, bulk.res)}</span>{/if}
+                {/if}
+              </div>
+            </button>
+          {/each}
+        </div>
+      {/if}
     </section>
 
     <section class="pane projects-pane">
@@ -733,7 +850,8 @@
         {@const insightOk = eff.insight === undefined || insightAmt >= eff.insight}
         {@const computeOk = eff.compute === undefined || computeAmt >= eff.compute}
         {@const sentienceOk = eff.sentience === undefined || sentienceAmt >= eff.sentience}
-        {@const affordable = grainOk && outputOk && insightOk && computeOk && sentienceOk}
+        {@const reachOk = eff.reach === undefined || reachAmt >= eff.reach}
+        {@const affordable = grainOk && outputOk && insightOk && computeOk && sentienceOk && reachOk}
         <button
           class="project"
           class:locked={!unlocked}
@@ -752,8 +870,9 @@
               {eff.insight !== undefined ? ` ${fmt(eff.insight)} insight` : ''}
               {eff.compute !== undefined ? ` ${fmt(eff.compute)} compute` : ''}
               {eff.sentience !== undefined ? ` ${fmt(eff.sentience)} sentience` : ''}
+              {eff.reach !== undefined ? ` ${fmt(eff.reach)} reach` : ''}
               {#if !affordable}
-                {@const blockingRes = !grainOk ? 'grain' : !outputOk ? 'output' : !insightOk ? 'insight' : !computeOk ? 'compute' : 'sentience'}
+                {@const blockingRes = !grainOk ? 'grain' : !outputOk ? 'output' : !insightOk ? 'insight' : !computeOk ? 'compute' : !sentienceOk ? 'sentience' : 'reach'}
                 {@const blockingCost = eff[blockingRes] ?? 0}
                 <span class="eta-inline">· in {etaForRes(blockingCost, blockingRes)}</span>
               {/if}
@@ -1227,6 +1346,12 @@
     background: linear-gradient(180deg, rgba(197,88,58,0.06) 0%, rgba(197,88,58,0.0) 100%);
   }
   .extracted-val { color: var(--ember, #c5583a); }
+  .cosmic-ship {
+    border-left: 3px solid var(--gilt, #d4a13a);
+    background: linear-gradient(180deg, rgba(212,161,58,0.06) 0%, rgba(212,161,58,0.0) 100%);
+  }
+  .colonized-val { color: var(--gilt, #d4a13a); }
+  .victory-modal { border-color: var(--gilt, #d4a13a); }
 
   .eta { font-size: 0.62rem; opacity: 0.55; letter-spacing: 0.06em; text-transform: uppercase; display: block; margin-top: 0.15rem; }
   .eta.starving { color: var(--ember, #c5583a); opacity: 0.9; }

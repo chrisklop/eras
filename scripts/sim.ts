@@ -12,6 +12,7 @@ import { industrialUpgrades, outputCap, outputPerSec, grainDrainPerSec, coalCap,
 import { informationUpgrades, insightCap, insightPerSec, stationGoodsDrainPerSec } from '../src/game/eras/information';
 import { algorithmicUpgrades, computeCap, computePerSec, rackInsightDrainPerSec } from '../src/game/eras/algorithmic';
 import { posthumanUpgrades, sentienceCap, sentiencePerSec, engineComputeDrainPerSec, popExtractedPerEngine } from '../src/game/eras/posthuman';
+import { cosmicUpgrades, reachCap, reachPerSec, shipSentienceDrainPerSec, popDeployedPerShip } from '../src/game/eras/cosmic';
 import { projects, projectAvailable, canAffordProject } from '../src/game/projects';
 import { initialState, type GameState } from '../src/game/game';
 
@@ -98,7 +99,7 @@ function tick(s: GameState, dt: number) {
   }
 
   // Posthuman: cognition engines drain compute → produce sentience
-  if (s.era === 'posthuman') {
+  if (s.era === 'posthuman' || s.era === 'cosmic') {
     const engines = s.upgrades.cognitionEngine ?? 0;
     const sCap = sentienceCap(s);
     if (engines > 0) {
@@ -109,6 +110,19 @@ function tick(s: GameState, dt: number) {
       s.resources.sentience = Math.min(sCap, (s.resources.sentience ?? 0) + sentiencePerSec(s) * dt * f);
     } else {
       s.resources.sentience = Math.min(sCap, (s.resources.sentience ?? 0) + sentiencePerSec(s) * dt);
+    }
+  }
+
+  // Cosmic: colony ships drain sentience → produce reach
+  if (s.era === 'cosmic') {
+    const ships = s.upgrades.colonyShip ?? 0;
+    const rCap = reachCap(s);
+    if (ships > 0) {
+      const sNeeded = shipSentienceDrainPerSec(s) * dt;
+      const sAvail = s.resources.sentience ?? 0;
+      const f = sNeeded > 0 ? Math.min(1, sAvail / sNeeded) : 1;
+      s.resources.sentience = Math.max(0, sAvail - sNeeded * f);
+      s.resources.reach = Math.min(rCap, (s.resources.reach ?? 0) + reachPerSec(s) * dt * f);
     }
   }
   s.resources.grain = Math.max(0, Math.min(cap, (s.resources.grain ?? 0) + grainDelta));
@@ -193,7 +207,7 @@ function simulate(): { phases: PhaseLog[]; violations: string[]; reachedIR: bool
       applyProject(s, p.id);
       logPhase(`project: ${p.name}`);
       lastPurchaseTime = t;
-      if (p.id === 'theOverride') {
+      if (p.id === 'kardashevII') {
         return { phases, violations, reachedIR: true, finalState: s, elapsed: t };
       }
       continue;
@@ -265,7 +279,14 @@ function simulate(): { phases: PhaseLog[]; violations: string[]; reachedIR: bool
     };
     // Consider current-era buildings first so the sim doesn't permanently
     // prefer cheap prior-era upgrades and stall progression.
-    if (s.era === 'posthuman') {
+    if (s.era === 'cosmic') {
+      considerSet(cosmicUpgrades as any, 'information');
+      if (!bestUpgrade) considerSet(posthumanUpgrades as any, 'information');
+      if (!bestUpgrade) considerSet(algorithmicUpgrades as any, 'information');
+      if (!bestUpgrade) considerSet(informationUpgrades as any, 'information');
+      if (!bestUpgrade) considerSet(industrialUpgrades as any, 'industrial');
+      if (!bestUpgrade) considerSet(agrarianUpgrades, 'agrarian');
+    } else if (s.era === 'posthuman') {
       considerSet(posthumanUpgrades as any, 'information');
       if (!bestUpgrade) considerSet(algorithmicUpgrades as any, 'information');
       if (!bestUpgrade) considerSet(informationUpgrades as any, 'information');
@@ -294,6 +315,12 @@ function simulate(): { phases: PhaseLog[]; violations: string[]; reachedIR: bool
         const popAvail = s.resources.pop ?? 0;
         if (popAvail < extract) continue;
         s.resources.pop = popAvail - extract;
+      }
+      if (bestUpgrade.id === 'colonyShip') {
+        const deploy = popDeployedPerShip(s);
+        const popAvail = s.resources.pop ?? 0;
+        if (popAvail < deploy) continue;
+        s.resources.pop = popAvail - deploy;
       }
       spendResource(s, bestUpgrade.res, bestUpgrade.cost);
       s.upgrades[bestUpgrade.id] = lvl + 1;

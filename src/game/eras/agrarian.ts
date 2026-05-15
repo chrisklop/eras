@@ -197,11 +197,13 @@ export function popGrowthPerSec(s: GameState = get(game)): number {
 // Later-era buildings scale up worker demand so population stays a real
 // economic constraint. With 10K pop you can run ~20 racks comfortably; growing
 // past that requires growing pop too.
-const WORKERS_PER_PLOW = 1;
-const WORKERS_PER_MINE = 3;
-const WORKERS_PER_FACTORY = 20;
-const WORKERS_PER_STATION = 80;
-const WORKERS_PER_RACK = 300;
+const WORKERS_PER_PLOW = 2;
+const WORKERS_PER_MINE = 5;
+const WORKERS_PER_FACTORY = 30;
+const WORKERS_PER_STATION = 120;
+const WORKERS_PER_RACK = 500;
+const WORKERS_PER_ENGINE = 200;
+const WORKERS_PER_SHIP = 300;
 
 export function laborDemand(s: GameState = get(game)): number {
   return (
@@ -209,7 +211,9 @@ export function laborDemand(s: GameState = get(game)): number {
     (s.upgrades.mine ?? 0) * WORKERS_PER_MINE +
     (s.upgrades.factory ?? 0) * WORKERS_PER_FACTORY +
     (s.upgrades.signalStation ?? 0) * WORKERS_PER_STATION +
-    (s.upgrades.serverRack ?? 0) * WORKERS_PER_RACK
+    (s.upgrades.serverRack ?? 0) * WORKERS_PER_RACK +
+    (s.upgrades.cognitionEngine ?? 0) * WORKERS_PER_ENGINE +
+    (s.upgrades.colonyShip ?? 0) * WORKERS_PER_SHIP
   );
 }
 

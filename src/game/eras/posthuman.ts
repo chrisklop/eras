@@ -58,7 +58,7 @@ export const posthumanUpgrades: PosthumanUpgrade[] = [
   {
     id: 'cognitionEngine',
     name: 'Cognition Engine',
-    desc: 'A vat of recursive thought. Extracts citizens on build; produces Sentience while fed Compute.',
+    desc: 'A vat of recursive thought. Extracts 80 citizens on build and uses 200 workers ongoing; produces Sentience while fed Compute.',
     cost: (lvl) => ({ compute: Math.ceil(ENGINE_BASE_COST * Math.pow(ENGINE_COST_GROWTH, lvl)) }),
     effect: '+1 sentience/sec',
   },

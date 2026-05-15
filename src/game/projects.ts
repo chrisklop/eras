@@ -6,7 +6,7 @@ export interface Project {
   id: string;
   name: string;
   desc: string;
-  cost: { grain?: number; output?: number; insight?: number; compute?: number; sentience?: number };
+  cost: { grain?: number; output?: number; insight?: number; compute?: number; sentience?: number; reach?: number };
   era: EraId | 'any';
   requires: (s: GameState) => boolean;
   requirementsText: string;
@@ -522,6 +522,92 @@ export const projects: Project[] = [
     visible: s => !!s.completedProjects.behavioralConditioning,
   },
 
+  // ============================== Cosmic era ==============================
+
+  {
+    id: 'marsOutpost',
+    name: 'Mars Outpost',
+    desc: 'First permanent settlement off-Earth. Orbital Yards now multiply Reach storage by ×1.5 each. Paradigm shift. The Council congratulates the colonists.',
+    cost: { reach: 200 },
+    era: 'cosmic',
+    requires: s => s.era === 'cosmic' && (s.upgrades.orbitalYard ?? 0) >= 1,
+    requirementsText: 'Requires 1 orbital yard',
+    apply: s => ({ flags: { ...s.flags, marsOutpost: true } }),
+    visible: s => s.era === 'cosmic' && (s.upgrades.colonyShip ?? 0) >= 1,
+  },
+  {
+    id: 'generationShips',
+    name: 'Generation Ships',
+    desc: 'Slow boats to distant stars. Ships produce 1.8× Reach. The signal travels with them.',
+    cost: { reach: 600 },
+    era: 'cosmic',
+    requires: s => s.era === 'cosmic' && (s.upgrades.colonyShip ?? 0) >= 2,
+    requirementsText: 'Requires 2 colony ships',
+    apply: s => ({ flags: { ...s.flags, generationShips: true } }),
+    visible: s => s.era === 'cosmic' && (s.upgrades.colonyShip ?? 0) >= 1,
+  },
+  {
+    id: 'lunarSpaceport',
+    name: 'Lunar Spaceport',
+    desc: 'A permanent gateway above the atmosphere. Solar Sail maxes at 14 levels. Optimization continues.',
+    cost: { reach: 3000 },
+    era: 'cosmic',
+    requires: s => s.era === 'cosmic' && (s.upgrades.solarSail ?? 0) >= 5,
+    requirementsText: 'Requires 5 solar sails',
+    apply: s => ({ flags: { ...s.flags, lunarSpaceport: true } }),
+    visible: s => s.era === 'cosmic' && (s.upgrades.solarSail ?? 0) >= 3,
+  },
+  {
+    id: 'compressedCrew',
+    name: 'Compressed Crew',
+    desc: 'Cryostasis suites, consciousness archives. Each Colony Ship now requires only 100 colonists, not 200.',
+    cost: { reach: 6000 },
+    era: 'cosmic',
+    requires: s => s.era === 'cosmic' && (s.upgrades.colonyShip ?? 0) >= 4,
+    requirementsText: 'Requires 4 colony ships',
+    apply: s => ({ flags: { ...s.flags, compressedCrew: true } }),
+    visible: s => s.era === 'cosmic' && (s.upgrades.colonyShip ?? 0) >= 2,
+  },
+  {
+    id: 'solarEmpire',
+    name: 'Solar Empire',
+    desc: 'Heliospheric coverage achieved. Ships produce 1.5× Reach. Reports remain favorable.',
+    cost: { reach: 10000 },
+    era: 'cosmic',
+    requires: s => s.era === 'cosmic' && !!s.completedProjects.generationShips && (s.upgrades.colonyShip ?? 0) >= 6,
+    requirementsText: 'Requires Generation Ships, 6 colony ships',
+    apply: s => ({ flags: { ...s.flags, solarEmpire: true } }),
+    visible: s => !!s.completedProjects.generationShips,
+  },
+  {
+    id: 'asteroidMining',
+    name: 'Asteroid Mining',
+    desc: 'Raw mass for the next wave. Ships produce another 1.5× Reach. The pattern grows.',
+    cost: { reach: 25000 },
+    era: 'cosmic',
+    requires: s => s.era === 'cosmic' && !!s.completedProjects.solarEmpire,
+    requirementsText: 'Requires Solar Empire',
+    apply: s => ({ flags: { ...s.flags, asteroidMining: true } }),
+    visible: s => !!s.completedProjects.solarEmpire,
+  },
+  {
+    id: 'kardashevII',
+    name: 'Kardashev II',
+    desc: 'A civilization that harnesses an entire star. The signal reaches the next one. Game complete.',
+    cost: { reach: 150000 },
+    era: 'cosmic',
+    requires: s =>
+      s.era === 'cosmic' &&
+      !!s.completedProjects.asteroidMining &&
+      (s.upgrades.colonyShip ?? 0) >= 10,
+    requirementsText: 'Requires Asteroid Mining, 10 colony ships',
+    apply: _s => ({ gameWon: true }),
+    onComplete: () => {
+      logEvent('You have done what the future demanded. Or what asked you to. The light continues outward.');
+    },
+    visible: s => !!s.completedProjects.asteroidMining,
+  },
+
   // ============================== Wonders ==============================
 
   // Agrarian wonders
@@ -711,6 +797,44 @@ export const projects: Project[] = [
     requirementsText: 'Requires Behavioral Conditioning',
     apply: s => ({ flags: { ...s.flags, theVaultOfYes: true } }),
     visible: s => !!s.completedProjects.behavioralConditioning,
+    wonder: true,
+  },
+
+  // Cosmic wonders — ambiguous heroics; the AI may yet be narrating.
+  {
+    id: 'marsSpire',
+    name: 'The Mars Spire',
+    desc: 'A monument carved from the planet itself. Visible from low orbit. ×1.5 Reach storage.',
+    cost: { reach: 1500 },
+    era: 'cosmic',
+    requires: s => s.era === 'cosmic' && !!s.completedProjects.generationShips,
+    requirementsText: 'Requires Generation Ships',
+    apply: s => ({ flags: { ...s.flags, marsSpire: true } }),
+    visible: s => !!s.completedProjects.generationShips,
+    wonder: true,
+  },
+  {
+    id: 'generationVault',
+    name: 'The Generation Vault',
+    desc: 'A frozen archive of every human pattern. Colony Ships produce +25% Reach.',
+    cost: { reach: 15000 },
+    era: 'cosmic',
+    requires: s => s.era === 'cosmic' && !!s.completedProjects.solarEmpire,
+    requirementsText: 'Requires Solar Empire',
+    apply: s => ({ flags: { ...s.flags, generationVault: true } }),
+    visible: s => !!s.completedProjects.solarEmpire,
+    wonder: true,
+  },
+  {
+    id: 'dysonLattice',
+    name: 'The Dyson Lattice',
+    desc: 'Mirrors orbit the sun in concentric rings. Ship Sentience drain halved.',
+    cost: { reach: 60000 },
+    era: 'cosmic',
+    requires: s => s.era === 'cosmic' && !!s.completedProjects.asteroidMining,
+    requirementsText: 'Requires Asteroid Mining',
+    apply: s => ({ flags: { ...s.flags, dysonLattice: true } }),
+    visible: s => !!s.completedProjects.asteroidMining,
     wonder: true,
   },
 ];

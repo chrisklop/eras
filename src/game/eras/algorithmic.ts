@@ -54,7 +54,7 @@ export const algorithmicUpgrades: AlgorithmicUpgrade[] = [
   {
     id: 'serverRack',
     name: 'Server Rack',
-    desc: 'Burns Insight into Compute cycles. Each needs 300 workers.',
+    desc: 'Burns Insight into Compute cycles. Each needs 500 workers.',
     cost: (lvl) => ({ insight: Math.ceil(RACK_BASE_COST * Math.pow(RACK_COST_GROWTH, lvl)) }),
     effect: '+0.5 compute/sec',
   },
@@ -116,7 +116,7 @@ export function rackStaticMult(s: GameState = get(game)): number {
   return Math.pow(LAB_PER_LEVEL, labs) * rackCostMult(s) * wonderMult;
 }
 
-const WORKERS_PER_RACK = 300;
+const WORKERS_PER_RACK = 500;
 export function laborAlgoDemand(s: GameState = get(game)): number {
   return (s.upgrades.serverRack ?? 0) * WORKERS_PER_RACK;
 }
