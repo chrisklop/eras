@@ -14,6 +14,7 @@
 import { get } from 'svelte/store';
 import { game, spend, logEvent, type GameState } from '../game';
 import { bulkCost, affordableCount } from './agrarian';
+import { eventMultiplier } from '../events';
 
 const ENGINE_BASE_COST = 50000;          // paid in compute
 const ENGINE_COST_GROWTH = 1.22;
@@ -132,7 +133,7 @@ export function sentiencePerSec(s: GameState = get(game)): number {
   const surveillance = s.flags.universalSurveillance
     ? (s.resources.pop ?? 0) * 0.005
     : 0;
-  return engines * ENGINE_SENTIENCE_BASE * engineStaticMult(s) + surveillance;
+  return (engines * ENGINE_SENTIENCE_BASE * engineStaticMult(s) + surveillance) * eventMultiplier('sentience');
 }
 
 const POSTHUMAN_MULTS: Record<string, (s: GameState) => number> = {

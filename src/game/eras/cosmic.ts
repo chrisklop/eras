@@ -14,6 +14,7 @@
 import { get } from 'svelte/store';
 import { game, spend, logEvent, type GameState } from '../game';
 import { bulkCost, affordableCount } from './agrarian';
+import { eventMultiplier } from '../events';
 
 const SHIP_BASE_COST = 30000;
 const SHIP_COST_GROWTH = 1.22;
@@ -130,7 +131,7 @@ export function shipSentienceDrainPerSec(s: GameState = get(game)): number {
 
 export function reachPerSec(s: GameState = get(game)): number {
   const ships = s.upgrades.colonyShip ?? 0;
-  return ships * SHIP_REACH_BASE * shipStaticMult(s);
+  return ships * SHIP_REACH_BASE * shipStaticMult(s) * eventMultiplier('reach');
 }
 
 const COSMIC_MULTS: Record<string, (s: GameState) => number> = {

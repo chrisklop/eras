@@ -21,6 +21,7 @@ import { bulkCost, affordableCount, popFactoryMultiplier, laborFraction } from '
 import { goodsProdAchMult } from '../achievements';
 import { legacyProductionMultiplier } from '../legacy';
 import { returnBuffMultiplier } from '../offline';
+import { eventMultiplier } from '../events';
 
 const FACTORY_BASE_COST = 1500;
 const FACTORY_COST_GROWTH = 1.25;
@@ -181,7 +182,7 @@ export function coalDrainPerSec(s: GameState = get(game)): number {
 }
 
 export function outputPerSec(s: GameState = get(game)): number {
-  return (s.upgrades.factory ?? 0) * FACTORY_OUTPUT_BASE * factoryOutputMult(s) * goodsProdAchMult() * legacyProductionMultiplier() * returnBuffMultiplier();
+  return (s.upgrades.factory ?? 0) * FACTORY_OUTPUT_BASE * factoryOutputMult(s) * goodsProdAchMult() * legacyProductionMultiplier() * returnBuffMultiplier() * eventMultiplier('output');
 }
 
 const INDUSTRIAL_MULTS: Record<string, (s: GameState) => number> = {

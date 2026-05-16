@@ -15,6 +15,7 @@ import { bulkCost, affordableCount, laborFraction } from './agrarian';
 import { insightProdAchMult } from '../achievements';
 import { legacyProductionMultiplier } from '../legacy';
 import { returnBuffMultiplier } from '../offline';
+import { eventMultiplier } from '../events';
 
 const STATION_BASE_COST = 40000;            // paid in goods
 const STATION_COST_GROWTH = 1.22;
@@ -143,7 +144,7 @@ export function insightPerSec(s: GameState = get(game)): number {
   const pop = Math.max(0, (s.resources.pop ?? 0) - laborInfoDemand(s));
   const popRate = s.flags.publicEducation ? PUBLIC_EDUCATION_POP_INSIGHT : BASE_POP_INSIGHT;
   const popInsight = pop * popRate;
-  return (stations * STATION_INSIGHT_BASE * stationStaticMult(s) * labor + popInsight) * insightProdAchMult() * legacyProductionMultiplier() * returnBuffMultiplier();
+  return (stations * STATION_INSIGHT_BASE * stationStaticMult(s) * labor + popInsight) * insightProdAchMult() * legacyProductionMultiplier() * returnBuffMultiplier() * eventMultiplier('insight');
 }
 
 const INFORMATION_MULTS: Record<string, (s: GameState) => number> = {

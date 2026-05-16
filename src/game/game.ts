@@ -17,6 +17,8 @@ export interface GameState {
   returnBuff?: { until: number; mult: number };
   /** True once the player completes Kardashev II (game won). */
   gameWon?: boolean;
+  /** Active random event affecting production rates. */
+  event?: { id: string; name: string; until: number; mult: number; res: string };
 }
 
 export const initialState: GameState = {

@@ -8,6 +8,7 @@ import { tickPosthuman } from './eras/posthuman';
 import { tickCosmic } from './eras/cosmic';
 import { saveState } from './save';
 import { checkAchievements } from './achievements';
+import { maybeFireEvent, clearStaleEvent } from './events';
 
 const TICK_MS = 100;
 const SAVE_EVERY_MS = 5000;
@@ -54,6 +55,8 @@ export function startLoop() {
     }
 
     checkAchievements();
+    clearStaleEvent();
+    maybeFireEvent();
 
     if (now - lastSave > SAVE_EVERY_MS) {
       saveState(get(game));

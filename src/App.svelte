@@ -25,12 +25,14 @@
   import { achievements, ACHIEVEMENTS, hydrateAchievements } from './game/achievements';
   import { applyOffline, returnBuffRemaining, returnBuffActive } from './game/offline';
   import { factsFor } from './game/facts';
+  import { eventSecondsLeft, eventActive } from './game/events';
 
   let showLegacy = false;
   let showAchievements = false;
   let showRoadmap = false;
   let offlineReport: ReturnType<typeof applyOffline> = null;
   let buffSecondsLeft = 0;
+  let eventSecsLeft = 0;
   let currentFact = '';
   let factIdx = 0;
 
@@ -43,6 +45,7 @@
     // Refresh buff countdown each second.
     const id = setInterval(() => {
       buffSecondsLeft = returnBuffRemaining();
+      eventSecsLeft = eventSecondsLeft();
     }, 1000);
     // Rotate trivia every 10 seconds, era-aware.
     const pickFact = () => {
@@ -389,6 +392,13 @@
         <span class="fact-text">{currentFact}</span>
       {/key}
     </div>
+    {#if eventSecsLeft > 0 && $game.event}
+      {@const ev = $game.event}
+      <div class="event-chip" class:event-bad={ev.mult < 1} title={`${ev.name}: ×${ev.mult.toFixed(2)} ${ev.res}`}>
+        <span class="buff-label">{ev.name}</span>
+        <span class="buff-val">{Math.floor(eventSecsLeft / 60)}:{String(Math.floor(eventSecsLeft % 60)).padStart(2, '0')}</span>
+      </div>
+    {/if}
     {#if buffSecondsLeft > 0}
       <div class="buff-chip" title="Return buff: ×2 production. Decays in real time.">
         <span class="buff-label">×2 boost</span>
@@ -1498,6 +1508,21 @@
     92%  { opacity: 1; transform: translateY(0); }
     100% { opacity: 0; transform: translateY(3px); }
   }
+
+  .event-chip {
+    display: inline-flex; flex-direction: column; align-items: center;
+    padding: 0.4rem 0.9rem; margin-right: 0.6rem;
+    background: rgba(212, 161, 58, 0.10);
+    border: 1px solid var(--gilt, #d4a13a);
+    color: var(--gilt, #d4a13a); border-radius: 4px;
+    font-family: inherit; max-width: 150px;
+  }
+  .event-chip.event-bad {
+    background: rgba(197, 88, 58, 0.10);
+    border-color: var(--ember, #c5583a);
+    color: var(--ember, #c5583a);
+  }
+  .event-chip .buff-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px; text-transform: none; letter-spacing: 0.05em; }
 
   .buff-chip {
     display: inline-flex; flex-direction: column; align-items: center;
