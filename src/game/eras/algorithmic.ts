@@ -56,7 +56,7 @@ export const algorithmicUpgrades: AlgorithmicUpgrade[] = [
     name: 'Server Rack',
     desc: 'Burns Insight into Compute cycles. Each needs 500 workers.',
     cost: (lvl) => ({ insight: Math.ceil(RACK_BASE_COST * Math.pow(RACK_COST_GROWTH, lvl)) }),
-    effect: '+0.5 compute/sec',
+    effect: '+1 compute/sec',
   },
   {
     id: 'dataCenter',

@@ -50,7 +50,7 @@ export const projects: Project[] = [
   {
     id: 'cropRotation',
     name: 'Crop Rotation',
-    desc: 'Alternate fields to keep the soil alive. Plows produce 2× base yield.',
+    desc: 'Alternate fields to keep the soil alive. Plows produce +50% yield.',
     cost: { grain: 300 },
     era: 'agrarian',
     requires: s => (s.upgrades.irrigation ?? 0) >= 2,
@@ -94,7 +94,7 @@ export const projects: Project[] = [
   {
     id: 'bronzeTools',
     name: 'Bronze Tools',
-    desc: 'Cast harder blades. Plows produce 3× more.',
+    desc: 'Cast harder blades. Plows produce +50% yield (stacks with Crop Rotation).',
     cost: { grain: 2500 },
     era: 'agrarian',
     requires: s => (s.upgrades.plow ?? 0) >= 10,
@@ -116,7 +116,7 @@ export const projects: Project[] = [
   {
     id: 'writing',
     name: 'Writing',
-    desc: 'Scribes record yields. Population now slowly produces grain.',
+    desc: 'Scribes record yields. Surplus citizens now produce 4× more grain (0.2/sec each).',
     cost: { grain: 5000 },
     era: 'agrarian',
     requires: s => (s.resources.pop ?? 0) >= 30,
@@ -127,7 +127,7 @@ export const projects: Project[] = [
   {
     id: 'compass',
     name: 'Compass',
-    desc: 'Maps and direction. Trade flourishes; population grows faster.',
+    desc: 'Maps and direction. +0.2/sec base population growth.',
     cost: { grain: 12000 },
     era: 'agrarian',
     requires: s => !!s.completedProjects.bronzeTools && !!s.completedProjects.writing,
@@ -159,7 +159,7 @@ export const projects: Project[] = [
   {
     id: 'bessemer',
     name: 'Bessemer Process',
-    desc: 'Coal-fired steel. Factories now require coal alongside grain, but produce 3× Goods.',
+    desc: 'Coal-fired steel. Factories now require coal alongside grain, but produce 1.8× Goods.',
     cost: { output: 300 },
     era: 'industrial',
     requires: s => s.era === 'industrial' && (s.upgrades.factory ?? 0) >= 3 && (s.upgrades.mine ?? 0) >= 1,
@@ -181,7 +181,7 @@ export const projects: Project[] = [
   {
     id: 'massProduction',
     name: 'Mass Production',
-    desc: 'Standard parts, assembly lines. Factories produce 2× Goods.',
+    desc: 'Standard parts, assembly lines. Factories produce 1.5× Goods.',
     cost: { output: 1200 },
     era: 'industrial',
     requires: s => s.era === 'industrial' && (s.upgrades.factory ?? 0) >= 4,
@@ -225,7 +225,7 @@ export const projects: Project[] = [
   {
     id: 'electricity',
     name: 'Electricity',
-    desc: 'Wire the cities. Goods production doubles again.',
+    desc: 'Wire the cities. Goods production multiplies by 1.5×.',
     cost: { output: 25000 },
     era: 'industrial',
     requires: s => s.era === 'industrial' && !!s.completedProjects.massProduction && (s.upgrades.factory ?? 0) >= 12,
@@ -614,7 +614,7 @@ export const projects: Project[] = [
   {
     id: 'stonehenge',
     name: 'Stonehenge',
-    desc: 'Mark the year. Standing stones aligned to the solstice. +50% population growth, permanent.',
+    desc: 'Mark the year. Standing stones aligned to the solstice. +0.2/sec base population growth, permanent.',
     cost: { grain: 2000 },
     era: 'agrarian',
     requires: s => (s.upgrades.plow ?? 0) >= 5,

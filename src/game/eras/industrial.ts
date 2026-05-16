@@ -78,13 +78,13 @@ export const industrialUpgrades: IndustrialUpgrade[] = [
     name: 'Steam Factory',
     desc: 'Burns grain (and after Bessemer, coal) to produce Goods.',
     cost: (lvl) => ({ grain: Math.ceil(FACTORY_BASE_COST * Math.pow(FACTORY_COST_GROWTH, lvl)) }),
-    effect: '+1 goods/sec',
+    effect: '+0.5 goods/sec',
     // Always visible in industrial era — the foundational building.
   },
   {
     id: 'warehouse',
     name: 'Warehouse',
-    desc: 'Stores Goods. Pre-Logistics: +200 cap. Post-Logistics: ×1.5 cap each.',
+    desc: 'Stores Goods. Pre-Logistics: +400 cap. Post-Logistics: ×1.5 cap each.',
     cost: (lvl) => ({ grain: Math.ceil(WAREHOUSE_BASE_COST * Math.pow(WAREHOUSE_COST_GROWTH, lvl)) }),
     effect: '+Goods storage',
     visible: s => (s.upgrades.factory ?? 0) >= 1,
@@ -92,9 +92,9 @@ export const industrialUpgrades: IndustrialUpgrade[] = [
   {
     id: 'workshop',
     name: 'Workshop',
-    desc: 'Tools, dies, jigs. Each level boosts Goods production by +20%.',
+    desc: 'Tools, dies, jigs. Each level boosts Goods production by +15%.',
     cost: (lvl) => ({ grain: Math.ceil(WORKSHOP_BASE_COST * Math.pow(WORKSHOP_COST_GROWTH, lvl)) }),
-    effect: '+20% Goods/sec',
+    effect: '+15% Goods/sec',
     visible: s => (s.upgrades.factory ?? 0) >= 2,
   },
   {
@@ -108,7 +108,7 @@ export const industrialUpgrades: IndustrialUpgrade[] = [
   {
     id: 'coalYard',
     name: 'Coal Yard',
-    desc: 'Stores coal. Pre-Refining: +150 cap. Post-Refining: ×1.5 cap each.',
+    desc: 'Stores coal. Pre-Refining: +300 cap. Post-Refining: ×1.5 cap each.',
     cost: (lvl) => ({ grain: Math.ceil(COAL_YARD_BASE_COST * Math.pow(COAL_YARD_COST_GROWTH, lvl)) }),
     effect: '+coal storage',
     visible: s => (s.upgrades.mine ?? 0) >= 1,

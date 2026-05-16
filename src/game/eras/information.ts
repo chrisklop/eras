@@ -63,7 +63,7 @@ export const informationUpgrades: InformationUpgrade[] = [
     name: 'Signal Station',
     desc: 'Burns Goods to produce Insight. Each needs 120 workers.',
     cost: (lvl) => ({ goods: Math.ceil(STATION_BASE_COST * Math.pow(STATION_COST_GROWTH, lvl)) }),
-    effect: '+0.5 insight/sec',
+    effect: '+1 insight/sec',
   },
   {
     id: 'archive',
