@@ -61,7 +61,7 @@ export const projects: Project[] = [
   {
     id: 'masonry',
     name: 'Masonry',
-    desc: 'Stack stones, fire brick. Build Brick Houses: each holds 12 (was 5), max 30.',
+    desc: 'Stack stones, fire brick. Build Brick Houses: each holds 8, max 25.',
     cost: { grain: 400 },
     era: 'agrarian',
     requires: s => !!s.completedProjects.pottery,
@@ -83,7 +83,7 @@ export const projects: Project[] = [
   {
     id: 'cityPlanning',
     name: 'City Planning',
-    desc: 'Roads, water, sewers. Insulae: each holds 25, max 50.',
+    desc: 'Roads, water, sewers. Insulae: each holds 15, max 40.',
     cost: { grain: 3000 },
     era: 'agrarian',
     requires: s => !!s.completedProjects.masonry,
@@ -170,7 +170,7 @@ export const projects: Project[] = [
   {
     id: 'tenements',
     name: 'Tenements',
-    desc: 'Cramped urban housing. Each tenement holds 60, max 80.',
+    desc: 'Cramped urban housing. Each tenement holds 30, max 60.',
     cost: { output: 6000 },
     era: 'industrial',
     requires: s => s.era === 'industrial' && (s.upgrades.factory ?? 0) >= 5,
@@ -236,7 +236,7 @@ export const projects: Project[] = [
   {
     id: 'apartmentBlocks',
     name: 'Apartment Blocks',
-    desc: 'Steel-framed high-rises. Each holds 150, max 120.',
+    desc: 'Steel-framed high-rises. Each holds 60, max 80.',
     cost: { output: 60000 },
     era: 'industrial',
     requires: s => !!s.completedProjects.electricity,
