@@ -24,11 +24,14 @@
   } from './game/legacy';
   import { achievements, ACHIEVEMENTS, hydrateAchievements } from './game/achievements';
   import { applyOffline, returnBuffRemaining, returnBuffActive } from './game/offline';
+  import { factsFor } from './game/facts';
 
   let showLegacy = false;
   let showAchievements = false;
   let offlineReport: ReturnType<typeof applyOffline> = null;
   let buffSecondsLeft = 0;
+  let currentFact = '';
+  let factIdx = 0;
 
   onMount(() => {
     hydrateAchievements();
@@ -40,7 +43,15 @@
     const id = setInterval(() => {
       buffSecondsLeft = returnBuffRemaining();
     }, 1000);
-    return () => clearInterval(id);
+    // Rotate trivia every 10 seconds, era-aware.
+    const pickFact = () => {
+      const pool = factsFor($game.era);
+      factIdx = Math.floor(Math.random() * pool.length);
+      currentFact = pool[factIdx];
+    };
+    pickFact();
+    const fid = setInterval(pickFact, 10000);
+    return () => { clearInterval(id); clearInterval(fid); };
   });
   onDestroy(stopLoop);
 
@@ -367,6 +378,11 @@
           </div>
         {/if}
       {/if}
+    </div>
+    <div class="fact-ticker" title="A passing thought.">
+      {#key currentFact}
+        <span class="fact-text">{currentFact}</span>
+      {/key}
     </div>
     {#if buffSecondsLeft > 0}
       <div class="buff-chip" title="Return buff: ×2 production. Decays in real time.">
@@ -1373,6 +1389,26 @@
     font-size: 0.6rem; letter-spacing: 0.18em; text-transform: uppercase;
     color: var(--gilt, #d4a13a); opacity: 0.85;
     border: 1px solid var(--gilt, #d4a13a); padding: 0.05rem 0.4rem; border-radius: 2px;
+  }
+
+  .fact-ticker {
+    flex: 1; min-width: 0; max-width: 360px;
+    padding: 0.4rem 0.9rem; margin-right: 0.6rem;
+    color: var(--ink, #e4d3a8); opacity: 0.55;
+    font-family: var(--font-display, serif); font-style: italic;
+    font-size: 0.78rem; line-height: 1.3;
+    text-align: right; overflow: hidden;
+    border-right: 1px solid rgba(212,161,58,0.18);
+  }
+  .fact-text {
+    display: inline-block;
+    animation: factFade 10s ease-in-out;
+  }
+  @keyframes factFade {
+    0%   { opacity: 0; transform: translateY(-3px); }
+    8%   { opacity: 1; transform: translateY(0); }
+    92%  { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(3px); }
   }
 
   .buff-chip {

@@ -197,22 +197,60 @@ export function popGrowthPerSec(s: GameState = get(game)): number {
 // Later-era buildings scale up worker demand so population stays a real
 // economic constraint. With 10K pop you can run ~20 racks comfortably; growing
 // past that requires growing pop too.
+// Every building needs workers — keeps population from accumulating as dead weight.
+// Early-game (Agrarian) numbers are tiny so pop is still abundant.
 const WORKERS_PER_PLOW = 2;
+const WORKERS_PER_IRRIGATION = 1;
+const WORKERS_PER_GRANARY = 1;
 const WORKERS_PER_MINE = 5;
+const WORKERS_PER_COALYARD = 2;
+const WORKERS_PER_WAREHOUSE = 2;
+const WORKERS_PER_WORKSHOP = 5;
 const WORKERS_PER_FACTORY = 30;
+const WORKERS_PER_RAILROAD = 4;
+const WORKERS_PER_ARCHIVE = 5;
+const WORKERS_PER_PRESS = 10;
+const WORKERS_PER_WIRE = 5;
 const WORKERS_PER_STATION = 120;
+const WORKERS_PER_DATACENTER = 10;
+const WORKERS_PER_LAB = 20;
+const WORKERS_PER_FIBER = 10;
 const WORKERS_PER_RACK = 500;
+const WORKERS_PER_GRID = 30;
+const WORKERS_PER_FOUNDRY = 40;
+const WORKERS_PER_TAP = 20;
 const WORKERS_PER_ENGINE = 200;
+const WORKERS_PER_YARD = 30;
+const WORKERS_PER_BAY = 50;
+const WORKERS_PER_SAIL = 20;
 const WORKERS_PER_SHIP = 300;
 
 export function laborDemand(s: GameState = get(game)): number {
   return (
     (s.upgrades.plow ?? 0) * WORKERS_PER_PLOW +
+    (s.upgrades.irrigation ?? 0) * WORKERS_PER_IRRIGATION +
+    (s.upgrades.granary ?? 0) * WORKERS_PER_GRANARY +
     (s.upgrades.mine ?? 0) * WORKERS_PER_MINE +
+    (s.upgrades.coalYard ?? 0) * WORKERS_PER_COALYARD +
+    (s.upgrades.warehouse ?? 0) * WORKERS_PER_WAREHOUSE +
+    (s.upgrades.workshop ?? 0) * WORKERS_PER_WORKSHOP +
     (s.upgrades.factory ?? 0) * WORKERS_PER_FACTORY +
+    (s.upgrades.railroad ?? 0) * WORKERS_PER_RAILROAD +
+    (s.upgrades.archive ?? 0) * WORKERS_PER_ARCHIVE +
+    (s.upgrades.printingPress ?? 0) * WORKERS_PER_PRESS +
+    (s.upgrades.wireNetwork ?? 0) * WORKERS_PER_WIRE +
     (s.upgrades.signalStation ?? 0) * WORKERS_PER_STATION +
+    (s.upgrades.dataCenter ?? 0) * WORKERS_PER_DATACENTER +
+    (s.upgrades.algorithmLab ?? 0) * WORKERS_PER_LAB +
+    (s.upgrades.fiberOptic ?? 0) * WORKERS_PER_FIBER +
     (s.upgrades.serverRack ?? 0) * WORKERS_PER_RACK +
+    (s.upgrades.surveillanceGrid ?? 0) * WORKERS_PER_GRID +
+    (s.upgrades.memeticFoundry ?? 0) * WORKERS_PER_FOUNDRY +
+    (s.upgrades.neuralTap ?? 0) * WORKERS_PER_TAP +
     (s.upgrades.cognitionEngine ?? 0) * WORKERS_PER_ENGINE +
+    (s.upgrades.orbitalYard ?? 0) * WORKERS_PER_YARD +
+    (s.upgrades.terraformingBay ?? 0) * WORKERS_PER_BAY +
+    (s.upgrades.solarSail ?? 0) * WORKERS_PER_SAIL +
     (s.upgrades.colonyShip ?? 0) * WORKERS_PER_SHIP
   );
 }
