@@ -28,6 +28,7 @@
 
   let showLegacy = false;
   let showAchievements = false;
+  let showRoadmap = false;
   let offlineReport: ReturnType<typeof applyOffline> = null;
   let buffSecondsLeft = 0;
   let currentFact = '';
@@ -379,6 +380,10 @@
         {/if}
       {/if}
     </div>
+    <button class="legacy-chip" on:click={() => (showRoadmap = true)} title="Open Roadmap">
+      <span class="legacy-label">Roadmap</span>
+      <span class="legacy-val">{projects.filter(p => projectIncomplete(p, $game)).length}</span>
+    </button>
     <div class="fact-ticker" title="A passing thought.">
       {#key currentFact}
         <span class="fact-text">{currentFact}</span>
@@ -462,6 +467,72 @@
             </div>
           {/each}
         </section>
+      </div>
+    </div>
+  {/if}
+
+  {#if showRoadmap}
+    {@const all = projects.filter(p => projectIncomplete(p, $game))}
+    {@const available = all.filter(p => projectAvailable(p, $game))}
+    {@const visible = all.filter(p => !projectAvailable(p, $game) && projectVisible(p, $game))}
+    {@const hidden = all.filter(p => !projectVisible(p, $game))}
+    <div class="modal-backdrop" on:click={() => (showRoadmap = false)}>
+      <div class="modal roadmap-modal" on:click|stopPropagation>
+        <header class="modal-head">
+          <h2>Roadmap</h2>
+          <button class="close" on:click={() => (showRoadmap = false)}>×</button>
+        </header>
+        <div class="dim small" style="margin-bottom: 0.8rem;">
+          Everything still to come. {available.length} ready · {visible.length} locked · {hidden.length} hidden.
+        </div>
+
+        {#if available.length > 0}
+          <section class="roadmap-section">
+            <h3>Available now</h3>
+            {#each available as p (p.id)}
+              {@const eff = effectiveProjectCost(p)}
+              <div class="roadmap-item ready" class:wonder-item={p.wonder}>
+                <div class="roadmap-name">
+                  <strong>{p.name}</strong>
+                  {#if p.wonder}<span class="wonder-tag">wonder</span>{/if}
+                  <span class="roadmap-era dim">{p.era}</span>
+                </div>
+                <div class="roadmap-cost">
+                  {eff.grain !== undefined ? `${fmt(eff.grain)}g ` : ''}
+                  {eff.output !== undefined ? `${fmt(eff.output)} goods ` : ''}
+                  {eff.insight !== undefined ? `${fmt(eff.insight)} ins ` : ''}
+                  {eff.compute !== undefined ? `${fmt(eff.compute)} comp ` : ''}
+                  {eff.sentience !== undefined ? `${fmt(eff.sentience)} sent ` : ''}
+                  {eff.reach !== undefined ? `${fmt(eff.reach)} reach ` : ''}
+                </div>
+                <div class="roadmap-desc dim small">{p.desc}</div>
+              </div>
+            {/each}
+          </section>
+        {/if}
+
+        {#if visible.length > 0}
+          <section class="roadmap-section">
+            <h3>Coming up</h3>
+            {#each visible as p (p.id)}
+              <div class="roadmap-item locked" class:wonder-item={p.wonder}>
+                <div class="roadmap-name">
+                  <strong>{p.name}</strong>
+                  {#if p.wonder}<span class="wonder-tag">wonder</span>{/if}
+                  <span class="roadmap-era dim">{p.era}</span>
+                </div>
+                <div class="roadmap-req">{p.requirementsText}</div>
+              </div>
+            {/each}
+          </section>
+        {/if}
+
+        {#if hidden.length > 0}
+          <section class="roadmap-section">
+            <h3>Hidden ({hidden.length})</h3>
+            <div class="dim small">{hidden.length} projects remain hidden. They unlock as you progress through the eras.</div>
+          </section>
+        {/if}
       </div>
     </div>
   {/if}
@@ -1390,6 +1461,23 @@
     color: var(--gilt, #d4a13a); opacity: 0.85;
     border: 1px solid var(--gilt, #d4a13a); padding: 0.05rem 0.4rem; border-radius: 2px;
   }
+
+  .roadmap-modal { width: min(700px, 94vw); }
+  .roadmap-section { margin-bottom: 1.2rem; }
+  .roadmap-section h3 { font-family: var(--font-display, serif); letter-spacing: 0.03em; margin: 0 0 0.5rem; }
+  .roadmap-item {
+    padding: 0.6rem 0.8rem; margin-bottom: 0.4rem;
+    border: 1px solid rgba(212,161,58,0.18); border-radius: 4px;
+  }
+  .roadmap-item.ready { border-color: var(--ink, #e4d3a8); background: rgba(228,211,168,0.05); }
+  .roadmap-item.locked { opacity: 0.7; }
+  .roadmap-item.wonder-item { border-color: var(--gilt, #d4a13a); }
+  .roadmap-name { display: flex; align-items: baseline; gap: 0.6rem; margin-bottom: 0.2rem; }
+  .roadmap-name strong { font-family: var(--font-display, serif); }
+  .roadmap-era { font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase; margin-left: auto; }
+  .roadmap-cost { font-family: var(--font-mono, monospace); font-size: 0.85rem; color: var(--gilt, #d4a13a); margin-bottom: 0.2rem; }
+  .roadmap-req { font-size: 0.85rem; opacity: 0.75; }
+  .roadmap-desc { margin-top: 0.2rem; }
 
   .fact-ticker {
     flex: 1; min-width: 0; max-width: 360px;
